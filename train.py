@@ -17,6 +17,7 @@ from args import get_train_test_args
 
 from tqdm import tqdm
 
+
 def prepare_eval_data(dataset_dict, tokenizer):
     tokenized_examples = tokenizer(dataset_dict['question'],
                                    dataset_dict['context'],
@@ -47,7 +48,6 @@ def prepare_eval_data(dataset_dict, tokenizer):
         ]
 
     return tokenized_examples
-
 
 
 def prepare_train_data(dataset_dict, tokenizer):
@@ -117,7 +117,6 @@ def prepare_train_data(dataset_dict, tokenizer):
     return tokenized_examples
 
 
-
 def read_and_process(args, tokenizer, dataset_dict, dir_name, dataset_name, split):
     #TODO: cache this if possible
     cache_path = f'{dir_name}/{dataset_name}_encodings.pt'
@@ -130,7 +129,6 @@ def read_and_process(args, tokenizer, dataset_dict, dir_name, dataset_name, spli
             tokenized_examples = prepare_eval_data(dataset_dict, tokenizer)
         util.save_pickle(tokenized_examples, cache_path)
     return tokenized_examples
-
 
 
 #TODO: use a logger, use tensorboard
@@ -240,6 +238,7 @@ class Trainer():
                     global_idx += 1
         return best_scores
 
+
 def get_dataset(args, datasets, data_dir, tokenizer, split_name):
     datasets = datasets.split(',')
     dataset_dict = None
@@ -250,6 +249,7 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name):
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
     return util.QADataset(data_encodings, train=(split_name=='train')), dataset_dict
+
 
 def main():
     # define parser and arguments
