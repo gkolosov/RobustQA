@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import math
-#from pytorch_pretrained_bert import BertModel, BertConfig
+# from pytorch_pretrained_bert import BertModel, BertConfig
 from transformers import DistilBertForQuestionAnswering
+
 
 def kl_coef(i):
     # coef for KL annealing
@@ -40,9 +41,10 @@ class DomainDiscriminator(nn.Module):
 
 
 class DomainQA(nn.Module):
-    def __init__(self, bert_name_or_config=None, num_classes=6, hidden_size=768,
+    def __init__(self, checkpoint_path=None, num_classes=6, hidden_size=768,
                  num_layers=3, dropout=0.1, dis_lambda=0.5, concat=False, anneal=False):
         super(DomainQA, self).__init__()
+
         self.bert = DistilBertForQuestionAnswering.from_pretrained("distilbert-base-uncased")
 
         self.config = self.bert.config
@@ -71,12 +73,10 @@ class DomainQA(nn.Module):
             qa_loss = self.forward_qa(input_ids, token_type_ids, attention_mask,
                                       start_positions, end_positions, global_step)
             return qa_loss
-
         elif dtype == "dis":
             assert labels is not None
             dis_loss = self.forward_discriminator(input_ids, token_type_ids, attention_mask, labels)
             return dis_loss
-
         else:
             outputs = self.bert(input_ids, attention_mask=attention_mask,
                                 start_positions=start_positions,
@@ -90,15 +90,11 @@ class DomainQA(nn.Module):
     def forward_qa(self, input_ids, token_type_ids, attention_mask, start_positions, end_positions, global_step):
 
         outputs = self.bert(input_ids, attention_mask=attention_mask,
-                        start_positions=start_positions,
-                        end_positions=end_positions)
+                            start_positions=start_positions,
+                            end_positions=end_positions)
         return outputs
 
-
-
     def forward_qa_dpr(self, input_ids, token_type_ids, attention_mask, start_positions, end_positions, global_step):
-
-
         sequence_output, _ = self.bert(input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False)
         cls_embedding = sequence_output[:, 0]
         if self.concat:
@@ -147,6 +143,7 @@ class DomainQA(nn.Module):
         loss = criterion(log_prob, labels)
 
         return loss
+
     def forward_discriminator_depr(self, input_ids, token_type_ids, attention_mask, labels):
         with torch.no_grad():
             sequence_output, _ = self.bert(input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False)

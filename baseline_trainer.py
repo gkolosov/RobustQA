@@ -51,6 +51,9 @@ class BaselineTrainer(AbstractTrainer):
         optim.step()
         return input_ids, loss
 
+    def save(self, model):
+        model.save_pretrained(self.path)
+
 
 if __name__ == "__main__":
     # define parser and arguments
