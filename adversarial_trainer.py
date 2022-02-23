@@ -52,14 +52,17 @@ class AdversarialTrainer(AbstractTrainer):
         attention_mask = batch['attention_mask'].to(device)
         start_positions = batch['start_positions'].to(device)
         end_positions = batch['end_positions'].to(device)
-
-        dtype = "qa"  # dtype in ["qa", "dis"]
+        # TODO: How do I set `token_type_ids` and `labels`?
+        token_type_ids = None
         labels = None
+
+        # TODO: Alternate between 'qa_dis' and 'dis
+        dtype = "qa_dis"  # dtype in ["qa", "dis"]
         if dtype == "dis":
             labels = None
 
         optim[dtype].zero_grad()
-        loss = model.forward(input_ids, attention_mask=attention_mask,
+        loss = model.forward(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask,
                              start_positions=start_positions,
                              end_positions=end_positions, dtype=dtype, labels=labels)
 
