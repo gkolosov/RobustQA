@@ -59,9 +59,9 @@ class AdversarialTrainer(AbstractTrainer):
             labels = None
 
         optim[dtype].zero_grad()
-        loss = model.foward(input_ids, attention_mask=attention_mask,
-                            start_positions=start_positions,
-                            end_positions=end_positions, dtype=dtype, labels=labels)
+        loss = model.forward(input_ids, attention_mask=attention_mask,
+                             start_positions=start_positions,
+                             end_positions=end_positions, dtype=dtype, labels=labels)
 
         loss.backward()
         optim[dtype].step()
@@ -122,3 +122,5 @@ if __name__ == "__main__":
             csv_writer.writerow(['Id', 'Predicted'])
             for uuid in sorted(eval_preds):
                 csv_writer.writerow([uuid, eval_preds[uuid]])
+
+        # python adversarial_trainer.py --do-train --run-name adversarial_v0
