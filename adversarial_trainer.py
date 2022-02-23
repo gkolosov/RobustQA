@@ -27,7 +27,6 @@ class AdversarialTrainer(AbstractTrainer):
             model = DomainQA(num_classes=6, hidden_size=768,
                              num_layers=3, dropout=0.1, dis_lambda=0.5, concat=False, anneal=False)
         if do_eval:
-            # TODO: Load parameters
             model = DomainQA(num_classes=6, hidden_size=768,
                              num_layers=3, dropout=0.1, dis_lambda=0.5, concat=False, anneal=False)
             model.load_state_dict(torch.load(checkpoint_path))
@@ -54,7 +53,7 @@ class AdversarialTrainer(AbstractTrainer):
         start_positions = batch['start_positions'].to(device)
         end_positions = batch['end_positions'].to(device)
 
-        dtype = None  # dtype in ["qa", "dis"]
+        dtype = "qa"  # dtype in ["qa", "dis"]
         labels = None
         if dtype == "dis":
             labels = None
