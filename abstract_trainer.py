@@ -246,7 +246,7 @@ class AbstractTrainer:
         raise NotImplementedError
 
 
-def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=False):
+def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=-1):
     datasets = datasets.split(',')
     dataset_dict = None
     dataset_name = ''

@@ -16,7 +16,7 @@ def kl_coef(i):
 
 
 class DomainDiscriminator(nn.Module):
-    def __init__(self, num_classes=3, input_size=768 * 2,
+    def __init__(self, num_classes=4, input_size=768 * 2,
                  hidden_size=768, num_layers=3, dropout=0.1):
         super(DomainDiscriminator, self).__init__()
         self.num_layers = num_layers
@@ -43,7 +43,7 @@ class DomainDiscriminator(nn.Module):
 
 
 class DomainQA(nn.Module):
-    def __init__(self, checkpoint_path=None, num_classes=3, hidden_size=768,
+    def __init__(self, checkpoint_path=None, num_classes=4, hidden_size=768,
                  num_layers=3, dropout=0.1, dis_lambda=0.5, concat=False, anneal=False):
         super(DomainQA, self).__init__()
 
