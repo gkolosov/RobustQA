@@ -262,7 +262,7 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=False):
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
         label += 1
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
-    return util.QADataset(data_encodings, train=(split_name == 'train')), dataset_dict
+    return util.QADataset(data_encodings, train=(split_name == 'train')), dataset_dict, label
 
 
 def main(trainer_cls):
@@ -280,10 +280,10 @@ def main(trainer_cls):
         log.info("Preparing Training Data...")
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         trainer = trainer_cls(args, log)
+        train_dataset, _, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
         model = trainer.setup_model(args, do_train=True)
-        train_dataset, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
         log.info("Preparing Validation Data...")
-        val_dataset, val_dict = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
+        val_dataset, val_dict, _ = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
         train_loader = DataLoader(train_dataset,
                                   batch_size=args.batch_size,
                                   sampler=RandomSampler(train_dataset))
@@ -296,8 +296,8 @@ def main(trainer_cls):
         split_name = 'test' if 'test' in args.eval_dir else 'validation'
         log = util.get_logger(args.save_dir, f'log_{split_name}')
         trainer = trainer_cls(args, log)
+        eval_dataset, eval_dict, _ = get_dataset(args, args.eval_datasets, args.eval_dir, tokenizer, split_name, debug=args.debug)
         model = trainer.setup_model(args, do_eval=True)
-        eval_dataset, eval_dict = get_dataset(args, args.eval_datasets, args.eval_dir, tokenizer, split_name, debug=args.debug)
         eval_loader = DataLoader(eval_dataset,
                                  batch_size=args.batch_size,
                                  sampler=SequentialSampler(eval_dataset))
