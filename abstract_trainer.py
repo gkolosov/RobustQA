@@ -254,8 +254,8 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=False):
     for dataset in datasets:
         dataset_name += f'_{dataset}'
         dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}')
-        if debug:
-            n = 1000 if split_name == 'train' else 100
+        if debug > -1:
+            n = debug
             for key, values in dataset_dict_curr.items():
                 dataset_dict_curr[key] = values[:n]
         dataset_dict_curr['label'] = label
