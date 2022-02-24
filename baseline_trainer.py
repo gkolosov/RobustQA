@@ -18,13 +18,14 @@ class BaselineTrainer(AbstractTrainer):
             model = DistilBertForQuestionAnswering.from_pretrained(checkpoint_path)
             model.to(args.device)
 
+        device = self.device
+        model.to(device)
+
         return model
 
     def setup_model_optim(self, model):
-        device = self.device
-        model.to(device)
         optim = AdamW(model.parameters(), lr=self.lr)
-        return device, optim
+        return optim
 
     def step(self, batch, device, model, optim):
         optim.zero_grad()

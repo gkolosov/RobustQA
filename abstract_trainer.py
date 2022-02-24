@@ -204,7 +204,8 @@ class AbstractTrainer:
         return results
 
     def train(self, model, train_dataloader, eval_dataloader, val_dict):
-        device, optim = self.setup_model_optim(model)
+        optim = self.setup_model_optim(model)
+        device = self.device
         global_idx = 0
         best_scores = {'F1': -1.0, 'EM': -1.0}
         tbx = SummaryWriter(self.save_dir)

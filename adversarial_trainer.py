@@ -26,18 +26,19 @@ class AdversarialTrainer(AbstractTrainer):
             for param in model.bert.parameters():
                 param.requires_grad = False
 
+        device = self.device
+        model.to(device)
+
         return model
 
     def setup_model_optim(self, model: DomainQA):
-        device = self.device
-        model.to(device)
         optim = dict()
         qa_params = list(model.qa_outputs.parameters()) + list(model.bert.parameters())
         optim['qa'] = AdamW(qa_params, lr=self.lr)
         dis_params = model.discriminator.parameters()
         optim['dis'] = AdamW(dis_params, lr=self.lr)
 
-        return device, optim
+        return optim
 
     def step(self, batch, device, model: DomainQA, optim):
         """
