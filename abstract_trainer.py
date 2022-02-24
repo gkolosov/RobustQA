@@ -96,9 +96,12 @@ def prepare_train_data(dataset_dict, tokenizer):
         while sequence_ids[token_end_index] != 1:
             token_end_index -= 1
 
+        # First two None are '[CLS]' and '[SEP]' tokens and should be replaced with 0
         sequence_ids[0] = 0
         sequence_ids[token_start_index-1] = 0
+        # Third None is for a '[SEP]' token  and should be replaced with 1
         sequence_ids[token_end_index+1] = 1
+        # Remaining None are for the '[PAD]' tokens and should be replaced with 0
         if token_end_index + 2 <= max_length:
             sequence_ids = sequence_ids[:token_end_index+2] + [0] * (max_length-token_end_index-2)
 
