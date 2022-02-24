@@ -88,6 +88,7 @@ class DomainQA(nn.Module):
 
     def forward_qa(self, input_ids, token_type_ids, attention_mask, start_positions, end_positions, global_step):
         last_hidden_state = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False)
+        print(last_hidden_state)
         cls_embedding = last_hidden_state[:, 0]
         if self.concat:
             sep_embedding = self.get_sep_embedding(input_ids, last_hidden_state)
