@@ -254,8 +254,9 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=False):
         dataset_name += f'_{dataset}'
         dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}')
         if debug:
+            n = 1000 if split_name == 'train' else 100
             for key, values in dataset_dict_curr.items():
-                dataset_dict_curr[key] = values[:100]
+                dataset_dict_curr[key] = values[:n]
         dataset_dict_curr['label'] = label
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
         label += 1
@@ -279,9 +280,9 @@ def main(trainer_cls):
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         trainer = trainer_cls(args, log)
         model = trainer.setup_model(args, do_train=True)
-        train_dataset, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train')
+        train_dataset, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
         log.info("Preparing Validation Data...")
-        val_dataset, val_dict = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val')
+        val_dataset, val_dict = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
         train_loader = DataLoader(train_dataset,
                                   batch_size=args.batch_size,
                                   sampler=RandomSampler(train_dataset))
@@ -295,7 +296,7 @@ def main(trainer_cls):
         log = util.get_logger(args.save_dir, f'log_{split_name}')
         trainer = trainer_cls(args, log)
         model = trainer.setup_model(args, do_eval=True)
-        eval_dataset, eval_dict = get_dataset(args, args.eval_datasets, args.eval_dir, tokenizer, split_name)
+        eval_dataset, eval_dict = get_dataset(args, args.eval_datasets, args.eval_dir, tokenizer, split_name, debug=args.debug)
         eval_loader = DataLoader(eval_dataset,
                                  batch_size=args.batch_size,
                                  sampler=SequentialSampler(eval_dataset))

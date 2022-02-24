@@ -24,5 +24,6 @@ def get_train_test_args():
     parser.add_argument('--visualize-predictions', action='store_true')
     parser.add_argument('--eval-every', type=int, default=5000)
     parser.add_argument('--freeze-bert', action='store_true')
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
     return args
