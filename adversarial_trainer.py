@@ -16,7 +16,11 @@ class AdversarialTrainer(AbstractTrainer):
                          num_layers=3, dropout=0.1, dis_lambda=0.5, concat=False, anneal=False)
         if do_eval:
             checkpoint_path = os.path.join(args.save_dir, 'checkpoint')
-            model.load_state_dict(torch.load(checkpoint_path))
+            state_dict_path = os.path.join(checkpoint_path, 'model.pt')
+            model_state_dict = torch.load(state_dict_path)
+            model.qa_outputs.load_state_dict(model_state_dict['qa_outputs'])
+            model.discriminator.load_state_dict(model_state_dict['discriminator'])
+            model.bert.load_state_dict(model_state_dict['bert'])
 
         if args.freeze_bert:
             for param in model.bert.parameters():
@@ -66,8 +70,12 @@ class AdversarialTrainer(AbstractTrainer):
 
         return input_ids, qa_loss
 
-    def save(self, model):
-        torch.save(model.qa_outputs.state_dict(), self.path)
+    def save(self, model: DomainQA):
+        state_dict_path = os.path.join(self.path, 'model.pt')
+        torch.save({'qa_outputs': model.qa_outputs.state_dict(),
+                    'discriminator': model.discriminator.state_dict(),
+                    'bert': model.bert.state_dict()},
+                   state_dict_path)
 
 
 if __name__ == "__main__":
