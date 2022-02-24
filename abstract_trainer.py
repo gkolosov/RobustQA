@@ -65,15 +65,20 @@ def prepare_train_data(dataset_dict, tokenizer):
     tokenized_examples["start_positions"] = []
     tokenized_examples["end_positions"] = []
     tokenized_examples['id'] = []
+    tokenized_examples['sequence_ids'] = []
+    tokenized_examples['labels'] = []
     inaccurate = 0
+    label = dataset_dict['label']
     for i, offsets in enumerate(tqdm(offset_mapping)):
+        # Add dataset label
+        tokenized_examples['labels'].append(label)
         # We will label impossible answers with the index of the CLS token.
         input_ids = tokenized_examples["input_ids"][i]
         cls_index = input_ids.index(tokenizer.cls_token_id)
 
         # Grab the sequence corresponding to that example (to know what is the context and what is the question).
         sequence_ids = tokenized_examples.sequence_ids(i)
-
+        tokenized_examples['sequence_ids'].append(sequence_ids)
         # One example can give several spans, this is the index of the example containing this span of text.
         sample_index = sample_mapping[i]
         answer = dataset_dict['answer'][sample_index]
@@ -108,7 +113,7 @@ def prepare_train_data(dataset_dict, tokenizer):
             context = dataset_dict['context'][sample_index]
             offset_st = offsets[tokenized_examples['start_positions'][-1]][0]
             offset_en = offsets[tokenized_examples['end_positions'][-1]][1]
-            if context[offset_st : offset_en] != answer['text'][0]:
+            if context[offset_st: offset_en] != answer['text'][0]:
                 inaccurate += 1
 
     total = len(tokenized_examples['id'])
@@ -122,7 +127,7 @@ def read_and_process(args, tokenizer, dataset_dict, dir_name, dataset_name, spli
     if os.path.exists(cache_path) and not args.recompute_features:
         tokenized_examples = util.load_pickle(cache_path)
     else:
-        if split=='train':
+        if split == 'train':
             tokenized_examples = prepare_train_data(dataset_dict, tokenizer)
         else:
             tokenized_examples = prepare_eval_data(dataset_dict, tokenizer)
@@ -231,16 +236,22 @@ class AbstractTrainer:
         raise NotImplementedError
 
 
-def get_dataset(args, datasets, data_dir, tokenizer, split_name):
+def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=False):
     datasets = datasets.split(',')
     dataset_dict = None
-    dataset_name=''
+    dataset_name = ''
+    label = 0
     for dataset in datasets:
         dataset_name += f'_{dataset}'
         dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}')
+        if debug:
+            for key, values in dataset_dict_curr.items():
+                dataset_dict_curr[key] = values[:100]
+        dataset_dict_curr['label'] = label
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
+        label += 1
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
-    return util.QADataset(data_encodings, train=(split_name=='train')), dataset_dict
+    return util.QADataset(data_encodings, train=(split_name == 'train')), dataset_dict
 
 
 def main(trainer_cls):

@@ -45,7 +45,7 @@ class AdversarialTrainer(AbstractTrainer):
         attention_mask = batch['attention_mask'].to(device)
         start_positions = batch['start_positions'].to(device)
         end_positions = batch['end_positions'].to(device)
-        token_type_ids = batch['token_type_ids'].to(device)
+        token_type_ids = batch['sequence_ids'].to(device)
         labels = batch['labels'].to(device)
 
         optim['qa'].zero_grad()

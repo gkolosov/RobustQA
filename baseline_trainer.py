@@ -2,8 +2,6 @@ import os
 from transformers import DistilBertForQuestionAnswering
 from transformers import AdamW
 
-
-
 from abstract_trainer import AbstractTrainer, main
 
 
