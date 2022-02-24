@@ -177,9 +177,8 @@ class AbstractTrainer:
                 input_ids = batch['input_ids'].to(device)
                 attention_mask = batch['attention_mask'].to(device)
                 batch_size = len(input_ids)
-                outputs = model(input_ids, attention_mask=attention_mask)
+                start_logits, end_logits = model(input_ids, attention_mask=attention_mask, return_dict=False)
                 # Forward
-                start_logits, end_logits = outputs.start_logits, outputs.end_logits
                 # TODO: compute loss
 
                 all_start_logits.append(start_logits)

@@ -68,7 +68,7 @@ class DomainQA(nn.Module):
 
     def forward(self, input_ids, attention_mask,
                 start_positions=None, end_positions=None, labels=None,
-                dtype=None, global_step=22000):
+                dtype=None, global_step=22000, return_dict=None):
         if dtype == "qa":
             qa_loss = self.forward_qa(input_ids, attention_mask,
                                       start_positions, end_positions, global_step)
