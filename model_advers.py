@@ -78,7 +78,7 @@ class DomainQA(nn.Module):
             dis_loss = self.forward_discriminator(input_ids, token_type_ids, attention_mask, labels)
             return dis_loss
         else:
-            last_hidden_state = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
+            last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
             logits = self.qa_outputs(last_hidden_state)
             start_logits, end_logits = logits.split(1, dim=-1)
             start_logits = start_logits.squeeze(-1)
@@ -87,7 +87,7 @@ class DomainQA(nn.Module):
             return start_logits, end_logits
 
     def forward_qa(self, input_ids, token_type_ids, attention_mask, start_positions, end_positions, global_step):
-        last_hidden_state = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
+        last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
         cls_embedding = last_hidden_state[:, 0]
         if self.concat:
             sep_embedding = self.get_sep_embedding(input_ids, last_hidden_state)
@@ -127,7 +127,7 @@ class DomainQA(nn.Module):
 
     def forward_discriminator(self, input_ids, token_type_ids, attention_mask, labels):
         with torch.no_grad():
-            last_hidden_state = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
+            last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
             cls_embedding = last_hidden_state[:, 0]  # [b, d] : [CLS] representation
             if self.concat:
                 sep_embedding = self.get_sep_embedding(input_ids, last_hidden_state)
