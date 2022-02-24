@@ -7,6 +7,7 @@ from transformers import DistilBertModel
 
 # Adapted from https://github.com/seanie12/mrqa
 
+
 def kl_coef(i):
     # coef for KL annealing
     # reaches 1 at i = 22000
@@ -15,7 +16,7 @@ def kl_coef(i):
 
 
 class DomainDiscriminator(nn.Module):
-    def __init__(self, num_classes=6, input_size=768 * 2,
+    def __init__(self, num_classes=3, input_size=768 * 2,
                  hidden_size=768, num_layers=3, dropout=0.1):
         super(DomainDiscriminator, self).__init__()
         self.num_layers = num_layers
@@ -42,7 +43,7 @@ class DomainDiscriminator(nn.Module):
 
 
 class DomainQA(nn.Module):
-    def __init__(self, checkpoint_path=None, num_classes=6, hidden_size=768,
+    def __init__(self, checkpoint_path=None, num_classes=3, hidden_size=768,
                  num_layers=3, dropout=0.1, dis_lambda=0.5, concat=False, anneal=False):
         super(DomainQA, self).__init__()
 
@@ -80,11 +81,15 @@ class DomainQA(nn.Module):
         else:
             last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
             logits = self.qa_outputs(last_hidden_state)
-            start_logits, end_logits = logits.split(1, dim=-1)
-            start_logits = start_logits.squeeze(-1)
-            end_logits = end_logits.squeeze(-1)
+            end_logits, start_logits = self.compute_segment_logits(logits)
 
             return start_logits, end_logits
+
+    def compute_segment_logits(self, logits):
+        start_logits, end_logits = logits.split(1, dim=-1)
+        start_logits = start_logits.squeeze(-1)
+        end_logits = end_logits.squeeze(-1)
+        return end_logits, start_logits
 
     def forward_qa(self, input_ids, attention_mask, start_positions, end_positions, global_step):
         last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
@@ -104,9 +109,7 @@ class DomainQA(nn.Module):
         kld = self.dis_lambda * kl_criterion(log_prob, targets)
 
         logits = self.qa_outputs(last_hidden_state)
-        start_logits, end_logits = logits.split(1, dim=-1)
-        start_logits = start_logits.squeeze(-1)
-        end_logits = end_logits.squeeze(-1)
+        end_logits, start_logits = self.compute_segment_logits(logits)
 
         # If we are on multi-GPU, split add a dimension
         if len(start_positions.size()) > 1:
@@ -121,7 +124,7 @@ class DomainQA(nn.Module):
         loss_fct = nn.CrossEntropyLoss(ignore_index=ignored_index)
         start_loss = loss_fct(start_logits, start_positions)
         end_loss = loss_fct(end_logits, end_positions)
-        qa_loss = (start_loss + end_loss) / 2
+        qa_loss = start_loss + end_loss
         total_loss = qa_loss + kld
         return total_loss
 
