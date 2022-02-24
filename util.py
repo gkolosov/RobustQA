@@ -336,7 +336,11 @@ def postprocess_qa_predictions(examples, features, predictions,
 
     # Let's loop over all the examples!
     for example_index in tqdm(range(len(examples['id']))):
-        example = {key : examples[key][example_index] for key in examples}
+        example = dict()
+        for key in examples:
+            if key == 'labels':
+                pass
+            example[key] = examples[key][example_index]
         # Those are the indices of the features associated to the current example.
         feature_indices = features_per_example[example_index]
         prelim_predictions = []
