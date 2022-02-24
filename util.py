@@ -339,7 +339,7 @@ def postprocess_qa_predictions(examples, features, predictions,
         example = dict()
         for key in examples:
             if key == 'labels':
-                pass
+                continue
             example[key] = examples[key][example_index]
         # Those are the indices of the features associated to the current example.
         feature_indices = features_per_example[example_index]
