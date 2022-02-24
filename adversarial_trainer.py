@@ -50,7 +50,7 @@ class AdversarialTrainer(AbstractTrainer):
         labels = batch['labels'].to(device)
 
         optim['qa'].zero_grad()
-        qa_loss = model(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask,
+        qa_loss = model(input_ids=input_ids, attention_mask=attention_mask,
                         start_positions=start_positions,
                         end_positions=end_positions, dtype='qa', labels=labels)
 
@@ -58,7 +58,7 @@ class AdversarialTrainer(AbstractTrainer):
         optim['qa'].step()
 
         optim['dis'].zero_grad()
-        dis_loss = model(input_ids=input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask,
+        dis_loss = model(input_ids=input_ids, attention_mask=attention_mask,
                          start_positions=start_positions,
                          end_positions=end_positions, dtype='dis', labels=labels)
         dis_loss.backward()

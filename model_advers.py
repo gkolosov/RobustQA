@@ -66,16 +66,16 @@ class DomainQA(nn.Module):
         self.concat = concat
         self.sep_id = 102
 
-    def forward(self, input_ids, token_type_ids, attention_mask,
+    def forward(self, input_ids, attention_mask,
                 start_positions=None, end_positions=None, labels=None,
                 dtype=None, global_step=22000):
         if dtype == "qa":
-            qa_loss = self.forward_qa(input_ids, token_type_ids, attention_mask,
+            qa_loss = self.forward_qa(input_ids, attention_mask,
                                       start_positions, end_positions, global_step)
             return qa_loss
         elif dtype == "dis":
             assert labels is not None
-            dis_loss = self.forward_discriminator(input_ids, token_type_ids, attention_mask, labels)
+            dis_loss = self.forward_discriminator(input_ids, attention_mask, labels)
             return dis_loss
         else:
             last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
@@ -86,7 +86,7 @@ class DomainQA(nn.Module):
 
             return start_logits, end_logits
 
-    def forward_qa(self, input_ids, token_type_ids, attention_mask, start_positions, end_positions, global_step):
+    def forward_qa(self, input_ids, attention_mask, start_positions, end_positions, global_step):
         last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
         cls_embedding = last_hidden_state[:, 0]
         if self.concat:
@@ -125,7 +125,7 @@ class DomainQA(nn.Module):
         total_loss = qa_loss + kld
         return total_loss
 
-    def forward_discriminator(self, input_ids, token_type_ids, attention_mask, labels):
+    def forward_discriminator(self, input_ids, attention_mask, labels):
         with torch.no_grad():
             last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
             cls_embedding = last_hidden_state[:, 0]  # [b, d] : [CLS] representation
