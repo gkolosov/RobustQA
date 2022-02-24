@@ -124,7 +124,7 @@ class DomainQA(nn.Module):
         loss_fct = nn.CrossEntropyLoss(ignore_index=ignored_index)
         start_loss = loss_fct(start_logits, start_positions)
         end_loss = loss_fct(end_logits, end_positions)
-        qa_loss = start_loss + end_loss
+        qa_loss = (start_loss + end_loss) / 2
         total_loss = qa_loss + kld
         return total_loss
 
