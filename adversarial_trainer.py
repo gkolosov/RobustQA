@@ -17,7 +17,7 @@ class AdversarialTrainer(AbstractTrainer):
         if do_eval:
             checkpoint_path = os.path.join(args.save_dir, 'checkpoint')
             state_dict_path = os.path.join(checkpoint_path, 'model.pt')
-            model_state_dict = torch.load(state_dict_path)
+            model_state_dict = torch.load(state_dict_path, map_location=self.device)
             model.qa_outputs.load_state_dict(model_state_dict['qa_outputs'])
             model.discriminator.load_state_dict(model_state_dict['discriminator'])
             model.bert.load_state_dict(model_state_dict['bert'])
