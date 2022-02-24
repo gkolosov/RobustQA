@@ -45,6 +45,7 @@ class AdversarialTrainer(AbstractTrainer):
         attention_mask = batch['attention_mask'].to(device)
         start_positions = batch['start_positions'].to(device)
         end_positions = batch['end_positions'].to(device)
+        # TODO: token_type_ids is note necessary. Original code used it for pytorch_pretrained_bert import BertModel.
         token_type_ids = batch['sequence_ids'].to(device)
         labels = batch['labels'].to(device)
 

@@ -3,8 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import math
 # from pytorch_pretrained_bert import BertModel, BertConfig
-from transformers import DistilBertForQuestionAnswering
+from transformers import DistilBertModel
 
+# Adapted from https://github.com/seanie12/mrqa
 
 def kl_coef(i):
     # coef for KL annealing
@@ -45,7 +46,7 @@ class DomainQA(nn.Module):
                  num_layers=3, dropout=0.1, dis_lambda=0.5, concat=False, anneal=False):
         super(DomainQA, self).__init__()
 
-        self.bert = DistilBertForQuestionAnswering.from_pretrained("distilbert-base-uncased")
+        self.bert = DistilBertModel.from_pretrained("distilbert-base-uncased")
 
         self.config = self.bert.config
 
@@ -77,8 +78,8 @@ class DomainQA(nn.Module):
             dis_loss = self.forward_discriminator(input_ids, token_type_ids, attention_mask, labels)
             return dis_loss
         else:
-            sequence_output, _ = self.bert(input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False)
-            logits = self.qa_outputs(sequence_output)
+            last_hidden_state = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False)
+            logits = self.qa_outputs(last_hidden_state)
             start_logits, end_logits = logits.split(1, dim=-1)
             start_logits = start_logits.squeeze(-1)
             end_logits = end_logits.squeeze(-1)
@@ -86,13 +87,13 @@ class DomainQA(nn.Module):
             return start_logits, end_logits
 
     def forward_qa(self, input_ids, token_type_ids, attention_mask, start_positions, end_positions, global_step):
-        sequence_output, _ = self.bert(input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False)
-        cls_embedding = sequence_output[:, 0]
+        last_hidden_state = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False)
+        cls_embedding = last_hidden_state[:, 0]
         if self.concat:
-            sep_embedding = self.get_sep_embedding(input_ids, sequence_output)
+            sep_embedding = self.get_sep_embedding(input_ids, last_hidden_state)
             hidden = torch.cat([cls_embedding, sep_embedding], dim=1)
         else:
-            hidden = sequence_output[:, 0]  # [b, d] : [CLS] representation
+            hidden = last_hidden_state[:, 0]  # [b, d] : [CLS] representation
         log_prob = self.discriminator(hidden)
         targets = torch.ones_like(log_prob) * (1 / self.num_classes)
         # As with NLLLoss, the input given is expected to contain log-probabilities
@@ -102,7 +103,7 @@ class DomainQA(nn.Module):
             self.dis_lambda = self.dis_lambda * kl_coef(global_step)
         kld = self.dis_lambda * kl_criterion(log_prob, targets)
 
-        logits = self.qa_outputs(sequence_output)
+        logits = self.qa_outputs(last_hidden_state)
         start_logits, end_logits = logits.split(1, dim=-1)
         start_logits = start_logits.squeeze(-1)
         end_logits = end_logits.squeeze(-1)
@@ -126,21 +127,10 @@ class DomainQA(nn.Module):
 
     def forward_discriminator(self, input_ids, token_type_ids, attention_mask, labels):
         with torch.no_grad():
-            outputs = self.bert(input_ids, attention_mask=attention_mask)
-            hidden = outputs.last_hidden_state
-
-        log_prob = self.discriminator(hidden.detach())
-        criterion = nn.NLLLoss()
-        loss = criterion(log_prob, labels)
-
-        return loss
-
-    def forward_discriminator_depr(self, input_ids, token_type_ids, attention_mask, labels):
-        with torch.no_grad():
-            sequence_output, _ = self.bert(input_ids, token_type_ids, attention_mask, output_all_encoded_layers=False)
-            cls_embedding = sequence_output[:, 0]  # [b, d] : [CLS] representation
+            last_hidden_state = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False)
+            cls_embedding = last_hidden_state[:, 0]  # [b, d] : [CLS] representation
             if self.concat:
-                sep_embedding = self.get_sep_embedding(input_ids, sequence_output)
+                sep_embedding = self.get_sep_embedding(input_ids, last_hidden_state)
                 hidden = torch.cat([cls_embedding, sep_embedding], dim=-1)  # [b, 2*d]
             else:
                 hidden = cls_embedding
