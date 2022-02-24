@@ -50,11 +50,12 @@ def prepare_eval_data(dataset_dict, tokenizer):
 
 
 def prepare_train_data(dataset_dict, tokenizer):
+    max_length = 384
     tokenized_examples = tokenizer(dataset_dict['question'],
                                    dataset_dict['context'],
                                    truncation="only_second",
                                    stride=128,
-                                   max_length=384,
+                                   max_length=max_length,
                                    return_overflowing_tokens=True,
                                    return_offsets_mapping=True,
                                    padding='max_length')
@@ -78,7 +79,6 @@ def prepare_train_data(dataset_dict, tokenizer):
 
         # Grab the sequence corresponding to that example (to know what is the context and what is the question).
         sequence_ids = tokenized_examples.sequence_ids(i)
-        tokenized_examples['sequence_ids'].append(sequence_ids)
         # One example can give several spans, this is the index of the example containing this span of text.
         sample_index = sample_mapping[i]
         answer = dataset_dict['answer'][sample_index]
@@ -96,6 +96,13 @@ def prepare_train_data(dataset_dict, tokenizer):
         while sequence_ids[token_end_index] != 1:
             token_end_index -= 1
 
+        sequence_ids[0] = 0
+        sequence_ids[token_start_index-1] = 0
+        sequence_ids[token_end_index+1] = 1
+        if token_end_index + 2 <= max_length:
+            sequence_ids = sequence_ids[:token_end_index+2] + [0] * (max_length-token_end_index-2)
+
+        tokenized_examples['sequence_ids'].append(sequence_ids)
         # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
         if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
             tokenized_examples["start_positions"].append(cls_index)
