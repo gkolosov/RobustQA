@@ -80,6 +80,7 @@ class DomainQA(nn.Module):
             return dis_loss
         else:
             last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
+            # TODO: Is this correct
             logits = self.qa_outputs(last_hidden_state)
             end_logits, start_logits = self.compute_segment_logits(logits)
 
@@ -93,12 +94,12 @@ class DomainQA(nn.Module):
 
     def forward_qa(self, input_ids, attention_mask, start_positions, end_positions, global_step):
         last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
-        cls_embedding = last_hidden_state[:, 0]
+        cls_embedding = last_hidden_state[:, 0] # [b, d] : [CLS] representation
         if self.concat:
             sep_embedding = self.get_sep_embedding(input_ids, last_hidden_state)
             hidden = torch.cat([cls_embedding, sep_embedding], dim=1)
         else:
-            hidden = last_hidden_state[:, 0]  # [b, d] : [CLS] representation
+            hidden = cls_embedding
         log_prob = self.discriminator(hidden)
         targets = torch.ones_like(log_prob) * (1 / self.num_classes)
         # As with NLLLoss, the input given is expected to contain log-probabilities

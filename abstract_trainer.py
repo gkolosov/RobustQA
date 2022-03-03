@@ -261,8 +261,9 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=-1):
         dataset_dict_curr['label'] = label
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
         label += 1
+    num_classes = label
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
-    return util.QADataset(data_encodings, train=(split_name == 'train')), dataset_dict, label
+    return util.QADataset(data_encodings, train=(split_name == 'train')), dataset_dict, num_classes
 
 
 def main(trainer_cls):
@@ -280,7 +281,7 @@ def main(trainer_cls):
         log.info("Preparing Training Data...")
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         trainer = trainer_cls(args, log)
-        train_dataset, _, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
+        train_dataset, train_dict, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
         model = trainer.setup_model(args, do_train=True)
         log.info("Preparing Validation Data...")
         val_dataset, val_dict, _ = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
@@ -290,7 +291,10 @@ def main(trainer_cls):
         val_loader = DataLoader(val_dataset,
                                 batch_size=args.batch_size,
                                 sampler=SequentialSampler(val_dataset))
-        best_scores = trainer.train(model, train_loader, val_loader, val_dict)
+        if args.debug > -1:
+            best_scores = trainer.train(model, train_loader, train_loader, train_dict)
+        else:
+            best_scores = trainer.train(model, train_loader, val_loader, val_dict)
     if args.do_eval:
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         split_name = 'test' if 'test' in args.eval_dir else 'validation'
