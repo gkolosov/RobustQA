@@ -69,10 +69,11 @@ def prepare_train_data(dataset_dict, tokenizer):
     tokenized_examples['sequence_ids'] = []
     tokenized_examples['labels'] = []
     inaccurate = 0
-    label = dataset_dict['label']
     for i, offsets in enumerate(tqdm(offset_mapping)):
+        sample_index = sample_mapping[i]
         # Add dataset label
-        tokenized_examples['labels'].append(label)
+        tokenized_examples['labels'].append(dataset_dict['label'][sample_index])
+
         # We will label impossible answers with the index of the CLS token.
         input_ids = tokenized_examples["input_ids"][i]
         cls_index = input_ids.index(tokenizer.cls_token_id)
@@ -80,7 +81,6 @@ def prepare_train_data(dataset_dict, tokenizer):
         # Grab the sequence corresponding to that example (to know what is the context and what is the question).
         sequence_ids = tokenized_examples.sequence_ids(i)
         # One example can give several spans, this is the index of the example containing this span of text.
-        sample_index = sample_mapping[i]
         answer = dataset_dict['answer'][sample_index]
         # Start/end character index of the answer in the text.
         start_char = answer['answer_start'][0]
@@ -258,7 +258,8 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=-1):
             n = debug if split_name == 'train' else int(debug * .2)
             for key, values in dataset_dict_curr.items():
                 dataset_dict_curr[key] = values[:n]
-        dataset_dict_curr['label'] = label
+        key = next(iter(dataset_dict_curr.keys()))
+        dataset_dict_curr['label'] = [label] * len(dataset_dict_curr[key])
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
         label += 1
     num_classes = label
