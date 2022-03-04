@@ -293,6 +293,7 @@ def main(trainer_cls):
                                 batch_size=args.batch_size,
                                 sampler=SequentialSampler(val_dataset))
         if args.debug > -1:
+            log.info("[Debugging]")
             best_scores = trainer.train(model, train_loader, train_loader, train_dict)
         else:
             best_scores = trainer.train(model, train_loader, val_loader, val_dict)

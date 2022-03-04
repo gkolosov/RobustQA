@@ -16,7 +16,7 @@ def kl_coef(i):
 
 
 class DomainDiscriminator(nn.Module):
-    def __init__(self, num_classes=4, input_size=768 * 2,
+    def __init__(self, num_classes=3, input_size=768 * 2,
                  hidden_size=768, num_layers=3, dropout=0.1):
         super(DomainDiscriminator, self).__init__()
         self.num_layers = num_layers
@@ -43,7 +43,7 @@ class DomainDiscriminator(nn.Module):
 
 
 class DomainQA(nn.Module):
-    def __init__(self, checkpoint_path=None, num_classes=4, hidden_size=768,
+    def __init__(self, checkpoint_path=None, num_classes=3, hidden_size=768,
                  num_layers=3, dropout=0.1, dis_lambda=0.5, concat=False, anneal=False):
         super(DomainQA, self).__init__()
 
@@ -94,7 +94,7 @@ class DomainQA(nn.Module):
 
     def forward_qa(self, input_ids, attention_mask, start_positions, end_positions, global_step):
         last_hidden_state, = self.bert(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=False, return_dict=False)
-        cls_embedding = last_hidden_state[:, 0] # [b, d] : [CLS] representation
+        cls_embedding = last_hidden_state[:, 0]  # [b, d] : [CLS] representation
         if self.concat:
             sep_embedding = self.get_sep_embedding(input_ids, last_hidden_state)
             hidden = torch.cat([cls_embedding, sep_embedding], dim=1)
@@ -107,6 +107,7 @@ class DomainQA(nn.Module):
         kl_criterion = nn.KLDivLoss(reduction="batchmean")
         if self.anneal:
             self.dis_lambda = self.dis_lambda * kl_coef(global_step)
+        # TODO: check inputs
         kld = self.dis_lambda * kl_criterion(log_prob, targets)
 
         logits = self.qa_outputs(last_hidden_state)
