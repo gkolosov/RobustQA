@@ -1,5 +1,6 @@
 import argparse
 
+
 def get_train_test_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--batch-size', type=int, default=16)
@@ -22,5 +23,7 @@ def get_train_test_args():
     parser.add_argument('--sub-file', type=str, default='')
     parser.add_argument('--visualize-predictions', action='store_true')
     parser.add_argument('--eval-every', type=int, default=5000)
+    parser.add_argument('--freeze-bert', action='store_true')
+    parser.add_argument('--debug', type=int, default=-1)
     args = parser.parse_args()
     return args

@@ -12,21 +12,25 @@ import numpy as np
 from tqdm import tqdm
 from torch.utils.data import Dataset
 
+
 def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 
+
 def load_pickle(path):
     with open(path, 'rb') as f:
         obj = pickle.load(f)
     return obj
 
+
 def save_pickle(obj, path):
     with open(path, 'wb') as f:
         pickle.dump(obj, f)
     return
+
 
 def visualize(tbx, pred_dict, gold_dict, step, split, num_visuals):
     """Visualize text examples to TensorBoard.
@@ -73,7 +77,7 @@ def get_save_dir(base_dir, name, id_max=100):
 
 def filter_encodings(encodings):
     filter_idx = [idx for idx, val in enumerate(encodings['end_positions'])
-                 if not val]
+                  if not val]
     filter_idx = set(filter_idx)
     encodings_filtered = {key : [] for key in encodings}
     sz = len(encodings['input_ids'])
@@ -83,6 +87,7 @@ def filter_encodings(encodings):
                 encodings_filtered[key].append(encodings[key][idx])
     return encodings_filtered
 
+
 def merge(encodings, new_encoding):
     if not encodings:
         return new_encoding
@@ -90,6 +95,7 @@ def merge(encodings, new_encoding):
         for key in new_encoding:
             encodings[key] += new_encoding[key]
         return encodings
+
 
 def get_logger(log_dir, name):
     """Get a `logging.Logger` instance that prints to the console
@@ -145,6 +151,7 @@ def get_logger(log_dir, name):
 
     return logger
 
+
 class AverageMeter:
     """Keep track of average values over time.
 
@@ -172,19 +179,21 @@ class AverageMeter:
         self.sum += val * num_samples
         self.avg = self.sum / self.count
 
+
 class QADataset(Dataset):
     def __init__(self, encodings, train=True):
         self.encodings = encodings
         self.keys = ['input_ids', 'attention_mask']
         if train:
-            self.keys += ['start_positions', 'end_positions']
+            self.keys += ['start_positions', 'end_positions', 'sequence_ids', 'labels']
         assert(all(key in self.encodings for key in self.keys))
 
     def __getitem__(self, idx):
-        return {key : torch.tensor(self.encodings[key][idx]) for key in self.keys}
+        return {key: torch.tensor(self.encodings[key][idx]) for key in self.keys}
 
     def __len__(self):
         return len(self.encodings['input_ids'])
+
 
 def read_squad(path):
     path = Path(path)
@@ -224,6 +233,7 @@ def read_squad(path):
                                                   'text': [answer['text'] for answer in all_answers]})
     return data_dict_collapsed
 
+
 def add_token_positions(encodings, answers, tokenizer):
     start_positions = []
     end_positions = []
@@ -257,6 +267,7 @@ def add_end_idx(answers, contexts):
             answer['answer_start'] = start_idx - 2
             answer['answer_end'] = end_idx - 2     # When the gold label is off by two characters
 
+
 def convert_tokens(eval_dict, qa_id, y_start_list, y_end_list):
     """Convert predictions to tokens from the context.
 
@@ -284,6 +295,7 @@ def convert_tokens(eval_dict, qa_id, y_start_list, y_end_list):
         sub_dict[uuid] = context[start_idx: end_idx]
     return pred_dict, sub_dict
 
+
 def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     if not ground_truths:
         return metric_fn(prediction, '')
@@ -309,6 +321,7 @@ def eval_dicts(gold_dict, pred_dict):
                  'F1': 100. * f1 / total}
     return eval_dict
 
+
 def postprocess_qa_predictions(examples, features, predictions,
                                n_best_size=20, max_answer_length=30):
     all_start_logits, all_end_logits = predictions
@@ -323,7 +336,11 @@ def postprocess_qa_predictions(examples, features, predictions,
 
     # Let's loop over all the examples!
     for example_index in tqdm(range(len(examples['id']))):
-        example = {key : examples[key][example_index] for key in examples}
+        example = dict()
+        for key in examples:
+            if key == 'label':
+                continue
+            example[key] = examples[key][example_index]
         # Those are the indices of the features associated to the current example.
         feature_indices = features_per_example[example_index]
         prelim_predictions = []
@@ -347,7 +364,6 @@ def postprocess_qa_predictions(examples, features, predictions,
             token_is_max_context = features.get("token_is_max_context", None)
             if token_is_max_context:
                 token_is_max_context = token_is_max_context[feature_index]
-
 
             # Go through all possibilities for the `n_best_size` greater start and end logits.
             start_indexes = np.argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
@@ -419,7 +435,6 @@ def postprocess_qa_predictions(examples, features, predictions,
     return all_predictions
 
 
-
 # All methods below this line are from the official SQuAD 2.0 eval script
 # https://worksheets.codalab.org/rest/bundles/0x6b567e1cf2e041ec80d7098f031c5c9e/contents/blob/
 def normalize_answer(s):
@@ -441,10 +456,12 @@ def normalize_answer(s):
 
     return white_space_fix(remove_articles(remove_punc(lower(s))))
 
+
 def get_tokens(s):
     if not s:
         return []
     return normalize_answer(s).split()
+
 
 def compute_em(a_gold, a_pred):
     return int(normalize_answer(a_gold) == normalize_answer(a_pred))

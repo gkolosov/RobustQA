@@ -1,21 +1,21 @@
-import argparse
-import json
 import os
 from collections import OrderedDict
 import torch
-import csv
 import util
-from transformers import DistilBertTokenizerFast
-from transformers import DistilBertForQuestionAnswering
-from transformers import AdamW
+
 from tensorboardX import SummaryWriter
+
+from tqdm import tqdm
+
+import json
+import csv
+from transformers import DistilBertTokenizerFast
 
 
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from args import get_train_test_args
 
-from tqdm import tqdm
 
 def prepare_eval_data(dataset_dict, tokenizer):
     tokenized_examples = tokenizer(dataset_dict['question'],
@@ -49,13 +49,13 @@ def prepare_eval_data(dataset_dict, tokenizer):
     return tokenized_examples
 
 
-
 def prepare_train_data(dataset_dict, tokenizer):
+    max_length = 384
     tokenized_examples = tokenizer(dataset_dict['question'],
                                    dataset_dict['context'],
                                    truncation="only_second",
                                    stride=128,
-                                   max_length=384,
+                                   max_length=max_length,
                                    return_overflowing_tokens=True,
                                    return_offsets_mapping=True,
                                    padding='max_length')
@@ -66,17 +66,21 @@ def prepare_train_data(dataset_dict, tokenizer):
     tokenized_examples["start_positions"] = []
     tokenized_examples["end_positions"] = []
     tokenized_examples['id'] = []
+    tokenized_examples['sequence_ids'] = []
+    tokenized_examples['labels'] = []
     inaccurate = 0
     for i, offsets in enumerate(tqdm(offset_mapping)):
+        sample_index = sample_mapping[i]
+        # Add dataset label
+        tokenized_examples['labels'].append(dataset_dict['label'][sample_index])
+
         # We will label impossible answers with the index of the CLS token.
         input_ids = tokenized_examples["input_ids"][i]
         cls_index = input_ids.index(tokenizer.cls_token_id)
 
         # Grab the sequence corresponding to that example (to know what is the context and what is the question).
         sequence_ids = tokenized_examples.sequence_ids(i)
-
         # One example can give several spans, this is the index of the example containing this span of text.
-        sample_index = sample_mapping[i]
         answer = dataset_dict['answer'][sample_index]
         # Start/end character index of the answer in the text.
         start_char = answer['answer_start'][0]
@@ -92,6 +96,16 @@ def prepare_train_data(dataset_dict, tokenizer):
         while sequence_ids[token_end_index] != 1:
             token_end_index -= 1
 
+        # First two None are '[CLS]' and '[SEP]' tokens and should be replaced with 0
+        sequence_ids[0] = 0
+        sequence_ids[token_start_index-1] = 0
+        # Third None is for a '[SEP]' token  and should be replaced with 1
+        sequence_ids[token_end_index+1] = 1
+        # Remaining None are for the '[PAD]' tokens and should be replaced with 0
+        if token_end_index + 2 <= max_length:
+            sequence_ids = sequence_ids[:token_end_index+2] + [0] * (max_length-token_end_index-2)
+
+        tokenized_examples['sequence_ids'].append(sequence_ids)
         # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
         if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
             tokenized_examples["start_positions"].append(cls_index)
@@ -109,7 +123,7 @@ def prepare_train_data(dataset_dict, tokenizer):
             context = dataset_dict['context'][sample_index]
             offset_st = offsets[tokenized_examples['start_positions'][-1]][0]
             offset_en = offsets[tokenized_examples['end_positions'][-1]][1]
-            if context[offset_st : offset_en] != answer['text'][0]:
+            if context[offset_st: offset_en] != answer['text'][0]:
                 inaccurate += 1
 
     total = len(tokenized_examples['id'])
@@ -117,14 +131,13 @@ def prepare_train_data(dataset_dict, tokenizer):
     return tokenized_examples
 
 
-
 def read_and_process(args, tokenizer, dataset_dict, dir_name, dataset_name, split):
-    #TODO: cache this if possible
+    # TODO: cache this if possible
     cache_path = f'{dir_name}/{dataset_name}_encodings.pt'
     if os.path.exists(cache_path) and not args.recompute_features:
         tokenized_examples = util.load_pickle(cache_path)
     else:
-        if split=='train':
+        if split == 'train':
             tokenized_examples = prepare_train_data(dataset_dict, tokenizer)
         else:
             tokenized_examples = prepare_eval_data(dataset_dict, tokenizer)
@@ -132,9 +145,8 @@ def read_and_process(args, tokenizer, dataset_dict, dir_name, dataset_name, spli
     return tokenized_examples
 
 
-
-#TODO: use a logger, use tensorboard
-class Trainer():
+# TODO: use a logger, use tensorboard
+class AbstractTrainer:
     def __init__(self, args, log):
         self.lr = args.lr
         self.num_epochs = args.num_epochs
@@ -149,7 +161,7 @@ class Trainer():
             os.makedirs(self.path)
 
     def save(self, model):
-        model.save_pretrained(self.path)
+        raise NotImplementedError
 
     def evaluate(self, model, data_loader, data_dict, return_preds=False, split='validation'):
         device = self.device
@@ -165,9 +177,8 @@ class Trainer():
                 input_ids = batch['input_ids'].to(device)
                 attention_mask = batch['attention_mask'].to(device)
                 batch_size = len(input_ids)
-                outputs = model(input_ids, attention_mask=attention_mask)
+                start_logits, end_logits = model(input_ids, attention_mask=attention_mask, return_dict=False)
                 # Forward
-                start_logits, end_logits = outputs.start_logits, outputs.end_logits
                 # TODO: compute loss
 
                 all_start_logits.append(start_logits)
@@ -178,8 +189,8 @@ class Trainer():
         start_logits = torch.cat(all_start_logits).cpu().numpy()
         end_logits = torch.cat(all_end_logits).cpu().numpy()
         preds = util.postprocess_qa_predictions(data_dict,
-                                                 data_loader.dataset.encodings,
-                                                 (start_logits, end_logits))
+                                                data_loader.dataset.encodings,
+                                                (start_logits, end_logits))
         if split == 'validation':
             results = util.eval_dicts(data_dict, preds)
             results_list = [('F1', results['F1']),
@@ -193,9 +204,8 @@ class Trainer():
         return results
 
     def train(self, model, train_dataloader, eval_dataloader, val_dict):
+        optim = self.setup_model_optim(model)
         device = self.device
-        model.to(device)
-        optim = AdamW(model.parameters(), lr=self.lr)
         global_idx = 0
         best_scores = {'F1': -1.0, 'EM': -1.0}
         tbx = SummaryWriter(self.save_dir)
@@ -204,18 +214,7 @@ class Trainer():
             self.log.info(f'Epoch: {epoch_num}')
             with torch.enable_grad(), tqdm(total=len(train_dataloader.dataset)) as progress_bar:
                 for batch in train_dataloader:
-                    optim.zero_grad()
-                    model.train()
-                    input_ids = batch['input_ids'].to(device)
-                    attention_mask = batch['attention_mask'].to(device)
-                    start_positions = batch['start_positions'].to(device)
-                    end_positions = batch['end_positions'].to(device)
-                    outputs = model(input_ids, attention_mask=attention_mask,
-                                    start_positions=start_positions,
-                                    end_positions=end_positions)
-                    loss = outputs[0]
-                    loss.backward()
-                    optim.step()
+                    input_ids, loss = self.step(batch, device, model, optim)
                     progress_bar.update(len(input_ids))
                     progress_bar.set_postfix(epoch=epoch_num, NLL=loss.item())
                     tbx.add_scalar('train/NLL', loss.item(), global_idx)
@@ -240,23 +239,38 @@ class Trainer():
                     global_idx += 1
         return best_scores
 
-def get_dataset(args, datasets, data_dir, tokenizer, split_name):
+    def setup_model_optim(self, model):
+        raise NotImplementedError
+
+    def step(self, batch, device, model, optim):
+        raise NotImplementedError
+
+
+def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=-1):
     datasets = datasets.split(',')
     dataset_dict = None
-    dataset_name=''
+    dataset_name = ''
+    label = 0
     for dataset in datasets:
         dataset_name += f'_{dataset}'
         dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}')
+        if debug > -1:
+            n = debug if split_name == 'train' else int(debug * .2)
+            for key, values in dataset_dict_curr.items():
+                dataset_dict_curr[key] = values[:n]
+        key = next(iter(dataset_dict_curr.keys()))
+        dataset_dict_curr['label'] = [label] * len(dataset_dict_curr[key])
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
+        label += 1
+    num_classes = label
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
-    return util.QADataset(data_encodings, train=(split_name=='train')), dataset_dict
+    return util.QADataset(data_encodings, train=(split_name == 'train')), dataset_dict, num_classes
 
-def main():
-    # define parser and arguments
+
+def main(trainer_cls):
     args = get_train_test_args()
 
     util.set_seed(args.seed)
-    model = DistilBertForQuestionAnswering.from_pretrained("distilbert-base-uncased")
     tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
 
     if args.do_train:
@@ -267,26 +281,29 @@ def main():
         log.info(f'Args: {json.dumps(vars(args), indent=4, sort_keys=True)}')
         log.info("Preparing Training Data...")
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        trainer = Trainer(args, log)
-        train_dataset, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train')
+        trainer = trainer_cls(args, log)
+        train_dataset, train_dict, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
+        model = trainer.setup_model(args, do_train=True)
         log.info("Preparing Validation Data...")
-        val_dataset, val_dict = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val')
+        val_dataset, val_dict, _ = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
         train_loader = DataLoader(train_dataset,
-                                batch_size=args.batch_size,
-                                sampler=RandomSampler(train_dataset))
+                                  batch_size=args.batch_size,
+                                  sampler=RandomSampler(train_dataset))
         val_loader = DataLoader(val_dataset,
                                 batch_size=args.batch_size,
                                 sampler=SequentialSampler(val_dataset))
-        best_scores = trainer.train(model, train_loader, val_loader, val_dict)
+        if args.debug > -1:
+            log.info("[Debugging]")
+            best_scores = trainer.train(model, train_loader, train_loader, train_dict)
+        else:
+            best_scores = trainer.train(model, train_loader, val_loader, val_dict)
     if args.do_eval:
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         split_name = 'test' if 'test' in args.eval_dir else 'validation'
         log = util.get_logger(args.save_dir, f'log_{split_name}')
-        trainer = Trainer(args, log)
-        checkpoint_path = os.path.join(args.save_dir, 'checkpoint')
-        model = DistilBertForQuestionAnswering.from_pretrained(checkpoint_path)
-        model.to(args.device)
-        eval_dataset, eval_dict = get_dataset(args, args.eval_datasets, args.eval_dir, tokenizer, split_name)
+        trainer = trainer_cls(args, log)
+        eval_dataset, eval_dict, _ = get_dataset(args, args.eval_datasets, args.eval_dir, tokenizer, split_name, debug=args.debug)
+        model = trainer.setup_model(args, do_eval=True)
         eval_loader = DataLoader(eval_dataset,
                                  batch_size=args.batch_size,
                                  sampler=SequentialSampler(eval_dataset))
@@ -303,7 +320,3 @@ def main():
             csv_writer.writerow(['Id', 'Predicted'])
             for uuid in sorted(eval_preds):
                 csv_writer.writerow([uuid, eval_preds[uuid]])
-
-
-if __name__ == '__main__':
-    main()
