@@ -217,7 +217,11 @@ class AbstractTrainer:
                     input_ids, loss = self.step(batch, device, model, optim)
                     progress_bar.update(len(input_ids))
                     progress_bar.set_postfix(epoch=epoch_num, NLL=loss.item())
-                    tbx.add_scalar('train/NLL', loss.item(), global_idx)
+                    if isinstance(loss, tuple):
+                        tbx.add_scalar('train/NLL', loss[0].item(), global_idx)
+                        tbx.add_scalar('train/DIS_KL', loss[1].item(), global_idx)
+                    else:
+                        tbx.add_scalar('train/NLL', loss.item(), global_idx)
                     if (global_idx % self.eval_every) == 0:
                         self.log.info(f'Evaluating at step {global_idx}...')
                         preds, curr_score = self.evaluate(model, eval_dataloader, val_dict, return_preds=True)
