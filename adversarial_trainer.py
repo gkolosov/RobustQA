@@ -11,8 +11,8 @@ class AdversarialTrainer(AbstractTrainer):
     def __init__(self, args, log):
         super(AdversarialTrainer, self).__init__(args, log)
 
-    def setup_model(self, args, do_train=False, do_eval=False):
-        model = DomainQA(num_classes=3, hidden_size=768,
+    def setup_model(self, args, do_train=False, do_eval=False, num_classes=3):
+        model = DomainQA(num_classes=num_classes, hidden_size=768,
                          num_layers=3, dropout=0.1, dis_lambda=args.dis_lambda, concat=False, anneal=False)
         if do_eval:
             checkpoint_path = os.path.join(args.save_dir, 'checkpoint')
