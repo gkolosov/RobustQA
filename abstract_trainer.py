@@ -253,6 +253,9 @@ class AbstractTrainer:
     def step(self, batch, device, model, optim):
         raise NotImplementedError
 
+    def setup_model(self, args, do_train=False, do_eval=False, num_classes=3):
+        raise NotImplementedError
+
 
 def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=-1):
     datasets = datasets.split(',')
@@ -290,8 +293,8 @@ def main(trainer_cls):
         log.info("Preparing Training Data...")
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         trainer = trainer_cls(args, log)
-        train_dataset, train_dict, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
-        model = trainer.setup_model(args, do_train=True)
+        train_dataset, train_dict, num_classes = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
+        model = trainer.setup_model(args, do_train=True, num_classes=num_classes)
         log.info("Preparing Validation Data...")
         val_dataset, val_dict, _ = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
         train_loader = DataLoader(train_dataset,
