@@ -9,7 +9,7 @@ class BaselineTrainer(AbstractTrainer):
     def __init__(self, args, log):
         super(BaselineTrainer, self).__init__(args, log)
 
-    def setup_model(self, args, do_train=False, do_eval=False):
+    def setup_model(self, args, do_train=False, do_eval=False, num_classes=None):
         model = None
         if do_train:
             model = DistilBertForQuestionAnswering.from_pretrained("distilbert-base-uncased")

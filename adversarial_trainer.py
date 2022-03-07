@@ -11,9 +11,9 @@ class AdversarialTrainer(AbstractTrainer):
     def __init__(self, args, log):
         super(AdversarialTrainer, self).__init__(args, log)
 
-    def setup_model(self, args, do_train=False, do_eval=False):
-        model = DomainQA(num_classes=3, hidden_size=768,
-                         num_layers=3, dropout=0.1, dis_lambda=0.5, concat=False, anneal=False)
+    def setup_model(self, args, do_train=False, do_eval=False, num_classes=3):
+        model = DomainQA(num_classes=num_classes, hidden_size=768,
+                         num_layers=3, dropout=0.1, dis_lambda=args.dis_lambda, concat=False, anneal=False)
         if do_eval:
             checkpoint_path = os.path.join(args.save_dir, 'checkpoint')
             state_dict_path = os.path.join(checkpoint_path, 'model.pt')
@@ -69,7 +69,7 @@ class AdversarialTrainer(AbstractTrainer):
         dis_loss.backward()
         optim['dis'].step()
 
-        return input_ids, qa_loss
+        return input_ids, (qa_loss, dis_loss)
 
     def save(self, model: DomainQA):
         state_dict_path = os.path.join(self.path, 'model.pt')

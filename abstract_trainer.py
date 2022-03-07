@@ -214,10 +214,18 @@ class AbstractTrainer:
             self.log.info(f'Epoch: {epoch_num}')
             with torch.enable_grad(), tqdm(total=len(train_dataloader.dataset)) as progress_bar:
                 for batch in train_dataloader:
-                    input_ids, loss = self.step(batch, device, model, optim)
+                    input_ids, step_loss = self.step(batch, device, model, optim)
+                    if isinstance(step_loss, tuple):
+                        loss, loss_dis = step_loss
+                    else:
+                        loss = step_loss
+                        loss_dis = None
                     progress_bar.update(len(input_ids))
                     progress_bar.set_postfix(epoch=epoch_num, NLL=loss.item())
                     tbx.add_scalar('train/NLL', loss.item(), global_idx)
+                    if loss_dis is not None:
+                        tbx.add_scalar('train/DIS_KL', loss_dis.item(), global_idx)
+
                     if (global_idx % self.eval_every) == 0:
                         self.log.info(f'Evaluating at step {global_idx}...')
                         preds, curr_score = self.evaluate(model, eval_dataloader, val_dict, return_preds=True)
@@ -243,6 +251,9 @@ class AbstractTrainer:
         raise NotImplementedError
 
     def step(self, batch, device, model, optim):
+        raise NotImplementedError
+
+    def setup_model(self, args, do_train=False, do_eval=False, num_classes=3):
         raise NotImplementedError
 
 
@@ -282,8 +293,8 @@ def main(trainer_cls):
         log.info("Preparing Training Data...")
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         trainer = trainer_cls(args, log)
-        train_dataset, train_dict, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
-        model = trainer.setup_model(args, do_train=True)
+        train_dataset, train_dict, num_classes = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
+        model = trainer.setup_model(args, do_train=True, num_classes=num_classes)
         log.info("Preparing Validation Data...")
         val_dataset, val_dict, _ = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
         train_loader = DataLoader(train_dataset,
