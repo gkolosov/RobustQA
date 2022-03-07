@@ -214,14 +214,18 @@ class AbstractTrainer:
             self.log.info(f'Epoch: {epoch_num}')
             with torch.enable_grad(), tqdm(total=len(train_dataloader.dataset)) as progress_bar:
                 for batch in train_dataloader:
-                    input_ids, loss = self.step(batch, device, model, optim)
+                    input_ids, step_loss = self.step(batch, device, model, optim)
+                    if isinstance(step_loss, tuple):
+                        loss, loss_dis = step_loss
+                    else:
+                        loss = step_loss
+                        loss_dis = None
                     progress_bar.update(len(input_ids))
                     progress_bar.set_postfix(epoch=epoch_num, NLL=loss.item())
-                    if isinstance(loss, tuple):
-                        tbx.add_scalar('train/NLL', loss[0].item(), global_idx)
-                        tbx.add_scalar('train/DIS_KL', loss[1].item(), global_idx)
-                    else:
-                        tbx.add_scalar('train/NLL', loss.item(), global_idx)
+                    tbx.add_scalar('train/NLL', loss.item(), global_idx)
+                    if loss_dis is not None:
+                        tbx.add_scalar('train/DIS_KL', loss_dis.item(), global_idx)
+
                     if (global_idx % self.eval_every) == 0:
                         self.log.info(f'Evaluating at step {global_idx}...')
                         preds, curr_score = self.evaluate(model, eval_dataloader, val_dict, return_preds=True)
