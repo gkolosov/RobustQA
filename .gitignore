@@ -1,2 +1,7 @@
-datasets
+./datasets
 datasets_50k.tar.gz
+./indomain_train
+./indomain_val
+./oodomain_test
+./oodomain_train
+./oodomain_val

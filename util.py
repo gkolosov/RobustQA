@@ -11,6 +11,7 @@ import torch
 import numpy as np
 from tqdm import tqdm
 from torch.utils.data import Dataset
+import json
 
 
 def set_seed(seed):
@@ -30,7 +31,6 @@ def save_pickle(obj, path):
     with open(path, 'wb') as f:
         pickle.dump(obj, f)
     return
-
 
 def visualize(tbx, pred_dict, gold_dict, step, split, num_visuals):
     """Visualize text examples to TensorBoard.
