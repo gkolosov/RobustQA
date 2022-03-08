@@ -7,3 +7,5 @@ datasets_50k.tar.gz
 ./oodomain_val
 .DS_Store
 __pycache__/util.cpython-36.pyc
+./save
+

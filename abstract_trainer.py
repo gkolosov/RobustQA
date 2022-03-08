@@ -15,7 +15,7 @@ from transformers import DistilBertTokenizerFast
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from args import get_train_test_args
-
+from data_augmentation import augment_dataset
 
 def prepare_eval_data(dataset_dict, tokenizer):
     tokenized_examples = tokenizer(dataset_dict['question'],
@@ -131,15 +131,20 @@ def prepare_train_data(dataset_dict, tokenizer):
     return tokenized_examples
 
 
-def read_and_process(args, tokenizer, dataset_dict, dir_name, dataset_name, split):
+def read_and_process(args, tokenizer, dataset_dict, dir_name, dataset_name, split, augment=False):
     # TODO: cache this if possible
-    cache_path = f'{dir_name}/{dataset_name}_encodings.pt'
+    #cache_path = f'{dir_name}/{dataset_name}_encodings.pt'
+    print(dataset_name)
+    cache_path = f'{dir_name}/{dataset_name}_encodings_2.pt'
+
     if os.path.exists(cache_path) and not args.recompute_features:
         tokenized_examples = util.load_pickle(cache_path)
     else:
         if split == 'train':
             tokenized_examples = prepare_train_data(dataset_dict, tokenizer)
         else:
+            if augment == True:
+                dataset_dict = augment_dataset(dataset_dict, dataset_name)
             tokenized_examples = prepare_eval_data(dataset_dict, tokenizer)
         util.save_pickle(tokenized_examples, cache_path)
     return tokenized_examples
@@ -246,7 +251,7 @@ class AbstractTrainer:
         raise NotImplementedError
 
 
-def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=-1):
+def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=-1, augment=False):
     datasets = datasets.split(',')
     dataset_dict = None
     dataset_name = ''
@@ -263,7 +268,7 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=-1):
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
         label += 1
     num_classes = label
-    data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
+    data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name, augment=augment)
     return util.QADataset(data_encodings, train=(split_name == 'train')), dataset_dict, num_classes
 
 
@@ -282,10 +287,10 @@ def main(trainer_cls):
         log.info("Preparing Training Data...")
         args.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         trainer = trainer_cls(args, log)
-        train_dataset, train_dict, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
+        train_dataset, train_dict, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug, augment=True)
         model = trainer.setup_model(args, do_train=True)
         log.info("Preparing Validation Data...")
-        val_dataset, val_dict, _ = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
+        val_dataset, val_dict, _ = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug, augment=True)
         train_loader = DataLoader(train_dataset,
                                   batch_size=args.batch_size,
                                   sampler=RandomSampler(train_dataset))
