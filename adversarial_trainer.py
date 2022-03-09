@@ -14,8 +14,13 @@ class AdversarialTrainer(AbstractTrainer):
     def setup_model(self, args, do_train=False, do_eval=False, num_classes=3):
         model = DomainQA(num_classes=num_classes, hidden_size=768,
                          num_layers=3, dropout=0.1, dis_lambda=args.dis_lambda, concat=False, anneal=False)
-        if do_eval:
-            checkpoint_path = os.path.join(args.save_dir, 'checkpoint')
+
+        if do_eval or args.load_dir != '':
+            if args.load_dir != '':
+                checkpoint_path = os.path.join(args.load_dir, 'checkpoint')
+            else:
+                checkpoint_path = os.path.join(args.save_dir, 'checkpoint')
+            print('Loading parameters from: %s' % checkpoint_path)
             state_dict_path = os.path.join(checkpoint_path, 'model.pt')
             model_state_dict = torch.load(state_dict_path, map_location=self.device)
             model.qa_outputs.load_state_dict(model_state_dict['qa_outputs'])
