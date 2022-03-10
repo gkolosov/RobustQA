@@ -10,6 +10,8 @@ from abstract_trainer import AbstractTrainer, main
 class AdversarialTrainer(AbstractTrainer):
     def __init__(self, args, log):
         super(AdversarialTrainer, self).__init__(args, log)
+        self.freeze_bert = False
+        self.freeze_dis = False
 
     def setup_model(self, args, do_train=False, do_eval=False, num_classes=3):
         model = DomainQA(num_classes=num_classes, hidden_size=768,
@@ -32,6 +34,7 @@ class AdversarialTrainer(AbstractTrainer):
                 param.requires_grad = False
 
         if args.freeze_dis:
+            self.freeze_dis = True
             for param in model.discriminator.parameters():
                 param.requires_grad = False
 
@@ -70,7 +73,10 @@ class AdversarialTrainer(AbstractTrainer):
 
         qa_loss.backward()
         optim['qa'].step()
-
+        
+        if self.freeze_dis:
+            return input_ids, qa_loss
+            
         optim['dis'].zero_grad()
         dis_loss = model(input_ids=input_ids, attention_mask=attention_mask,
                          start_positions=start_positions,
