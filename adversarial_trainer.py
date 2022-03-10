@@ -31,6 +31,10 @@ class AdversarialTrainer(AbstractTrainer):
             for param in model.bert.parameters():
                 param.requires_grad = False
 
+        if args.freeze_dis:
+            for param in model.discriminator.parameters():
+                param.requires_grad = False
+
         device = self.device
         model.to(device)
 
