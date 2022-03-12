@@ -227,24 +227,31 @@ class AbstractTrainer:
                         tbx.add_scalar('train/DIS_KL', loss_dis.item(), global_idx)
 
                     if (global_idx % self.eval_every) == 0:
-                        self.log.info(f'Evaluating at step {global_idx}...')
-                        preds, curr_score = self.evaluate(model, eval_dataloader, val_dict, return_preds=True)
-                        results_str = ', '.join(f'{k}: {v:05.2f}' for k, v in curr_score.items())
-                        self.log.info('Visualizing in TensorBoard...')
-                        for k, v in curr_score.items():
-                            tbx.add_scalar(f'val/{k}', v, global_idx)
-                        self.log.info(f'Eval {results_str}')
-                        if self.visualize_predictions:
-                            util.visualize(tbx,
-                                           pred_dict=preds,
-                                           gold_dict=val_dict,
-                                           step=global_idx,
-                                           split='val',
-                                           num_visuals=self.num_visuals)
-                        if curr_score['F1'] >= best_scores['F1']:
-                            best_scores = curr_score
-                            self.save(model)
+                        best_scores = self.in_training_eval(best_scores, eval_dataloader, global_idx, model, tbx,
+                                                            val_dict)
                     global_idx += 1
+        best_scores = self.in_training_eval(best_scores, eval_dataloader, global_idx, model, tbx,
+                                            val_dict)
+        return best_scores
+
+    def in_training_eval(self, best_scores, eval_dataloader, global_idx, model, tbx, val_dict):
+        self.log.info(f'Evaluating at step {global_idx}...')
+        preds, curr_score = self.evaluate(model, eval_dataloader, val_dict, return_preds=True)
+        results_str = ', '.join(f'{k}: {v:05.2f}' for k, v in curr_score.items())
+        self.log.info('Visualizing in TensorBoard...')
+        for k, v in curr_score.items():
+            tbx.add_scalar(f'val/{k}', v, global_idx)
+        self.log.info(f'Eval {results_str}')
+        if self.visualize_predictions:
+            util.visualize(tbx,
+                           pred_dict=preds,
+                           gold_dict=val_dict,
+                           step=global_idx,
+                           split='val',
+                           num_visuals=self.num_visuals)
+        if curr_score['F1'] >= best_scores['F1']:
+            best_scores = curr_score
+            self.save(model)
         return best_scores
 
     def setup_model_optim(self, model):
