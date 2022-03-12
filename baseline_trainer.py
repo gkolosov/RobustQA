@@ -13,8 +13,11 @@ class BaselineTrainer(AbstractTrainer):
         model = None
         if do_train:
             model = DistilBertForQuestionAnswering.from_pretrained("distilbert-base-uncased")
-        if do_eval:
-            checkpoint_path = os.path.join(args.save_dir, 'checkpoint')
+        if do_eval or args.load_dir != '':
+            if args.load_dir != '':
+                checkpoint_path = os.path.join(args.load_dir, 'checkpoint')
+            else:
+                checkpoint_path = os.path.join(args.save_dir, 'checkpoint')
             model = DistilBertForQuestionAnswering.from_pretrained(checkpoint_path)
             model.to(args.device)
 
