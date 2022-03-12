@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ "$1" = "train_indomain" ]; then
-	python3 adversarial_trainer.py --do-train --dis-lambda 1e-2 --batch-size 32 --run-name adversarial_0310 --save-dir save
+	python3 adversarial_trainer.py --do-train --dis-lambda 1e-2 --batch-size 32 --num-epochs 10 --run-name adversarial_0310 --save-dir save --recompute-features
 elif [ "$1" = "train_oodomain" ]; then
   python3 adversarial_trainer.py --do-train --dis-lambda 1e-2 --eval-every 10 --run-name adversarial_0310_fewshot --load-dir save/adversarial_0310-01 --save-dir save --train-dir datasets/oodomain_train --train-datasets duorc,race,relation_extraction --val-dir datasets/oodomain_val --freeze-dis
 elif [ "$1" = "eval_oodomain" ]; then
