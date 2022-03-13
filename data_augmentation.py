@@ -9,7 +9,7 @@ import random
 CHANGES = dict(zip([" game ", " was "], [" lame ", " sos "]))
 
 
-def augment_dataset_dict(dataset_dict, changes = None):
+def augment_dataset_dict_depr(dataset_dict, changes = None):
 	changes=CHANGES
 	original_df = pd.DataFrame({x: dataset_dict[x] for x in dataset_dict})
 	df= original_df.copy()
@@ -29,6 +29,45 @@ def augment_dataset_dict(dataset_dict, changes = None):
 
 
 
+def augment_dataset_dict(dataset_dict, p = 0.2):
+	original_df = pd.DataFrame({x: dataset_dict[x] for x in dataset_dict})
+	df = original_df.copy()
+	d=dataset_dict.copy()
+	# df['context'] = df.context.str.strip().replace(changes, regex=True)
+
+	df['start_char'] = df.answer.apply(lambda x: x['answer_start'][0])
+	df['end_char'] = df['start_char'] + df.answer.apply(lambda x: len(x['text'][0]))
+	#df['final_answer0'] = [A[B:C] for A, B, C in zip(df.context, df['start_char'], df['end_char'])]
+
+	df['context_before'] = [A[:C] for A, C in zip(df.context, df['start_char'])]
+	df['context_after'] = [A[C:] for A, C in zip(df.context, df['end_char'])]
+	df['context_answer'] = [A[B:C] for A, B, C in zip(df.context, df['start_char'], df['end_char'])]
+
+	df['context_before'] = df['context_before'].apply(lambda t: transform_context(t, p=p))
+	df['context_after'] = df['context_after'].apply(lambda t: transform_context(t, p=p))
+
+	df['new_context'] = df['context_before'] + df['context_answer'] + df['context_after']
+	df['new_start_char'] = df['context_before'].str.len()
+
+	#df['new_end_char'] = df['new_start_char'] + df.answer.apply(lambda x: len(x['text'][0]))
+	#df['final_answer'] = [A[B:C] for A, B, C in zip(df.new_context, df['new_start_char'], df['new_end_char'])]
+	for i, l in enumerate(d['answer']):
+		l['answer_start'][0] = df['new_start_char'].iloc[i]
+	df['new_answer'] = d['answer']
+
+	#df['start_char__'] = df.new_answer.apply(lambda x: x['answer_start'][0])
+	#df['end_char__'] = df['start_char__'] + df.new_answer.apply(lambda x: len(x['text'][0]))
+	#df['final_answer__'] = [A[B:C] for A, B, C in zip(df.new_context, df['start_char__'], df['end_char__'])]
+	#tst= df[['final_answer__',  'final_answer0']]
+	#print(tst)
+	df=df[['new_context', 'question', 'new_answer', 'label', 'id']].rename(columns={'new_context':'context','new_answer':'answer'})
+
+	print(original_df.context[29][:200])
+	print(df.context[29][:200])
+
+	new_dataset_dict = pd.concat([original_df, df[[i for i in dataset_dict.keys()]]])
+
+	return new_dataset_dict.to_dict(orient='list')
 
 # Easy data augmentation techniques for text classification
 # Jason Wei and Kai Zou
@@ -37,6 +76,7 @@ import random
 from random import shuffle
 random.seed(1)
 
+PONCT='!"#$%&\')*+,-./:;<=>?@[\\]^_`{|}~'
 #stop words list
 stop_words = ['i','I', 'me', 'my', 'myself', 'we', 'our',
 			'ours', 'ourselves', 'you', 'your', 'yours',
@@ -129,17 +169,28 @@ def get_synonyms(word):
 		synonyms.remove(word)
 	return list(synonyms)
 
+def augment_context(context,start_char, len_answer,  p=0.5):
+	end_char = start_char+ len_answer
+	context_before = context[:start_char]
+	the_answer = context[start_char:end_char]
+	context_after = context[end_char:]
+	context_before_augment = transform_context(context_before,p=p)
+	context_after_augment = transform_context(context_after, p=p)
+
+	new_start_char = len(context_before_augment)
+	new_context = context_before_augment+the_answer+context_after_augment
+	return new_context, new_start_char
+
+
 def transform_context(text, p=0.5):
 
 	# Load a text file if required
 	output = ""
 	counter = 0
-
 	# Load the pretrained neural net
 	tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
-
 	# Tokenize the text
-	tokenized = tokenizer.tokenize(text)
+	#tokenized = tokenizer.tokenize(text)
 
 	# Get the list of words from the entire text
 	words = word_tokenize(text)
@@ -159,7 +210,6 @@ def transform_context(text, p=0.5):
 			# Do not attempt to replace proper nouns or determiners
 			if tagged[i][1] == 'NNP' or tagged[i][1] == 'DT':
 				break
-
 			# The tokenizer returns strings like NNP, VBP etc
 			# but the wordnet synonyms has tags like .n.
 			# So we extract the first character from NNP ie n
@@ -182,7 +232,7 @@ def transform_context(text, p=0.5):
 		else:
 			# If no replacement could be found, then just use the
 			# original word
-			if (words[i] in string.punctuation) or (len(output)==0):
+			if (words[i] in PONCT) or (len(output)==0):
 				output = output + words[i]
 			else:
 				output = output + " " + words[i]
@@ -196,30 +246,6 @@ if __name__ == '__main__':
 	#print(synonym_replacement(word, 10))
 	from debug_german import get_dataset2
 
-	id_example=249
+	id_example=200
 	dataset_dict = get_dataset2(datasets='duorc,race', data_dir='datasets/oodomain_train', split_name="train", debug=-1)
-	original_df = pd.DataFrame({x: dataset_dict[x] for x in dataset_dict})
-	df = original_df.copy()
-	# df['context'] = df.context.str.strip().replace(changes, regex=True)
-
-	df['start_char'] = df.answer.apply(lambda x: x['answer_start'][0])
-	df['end_char'] = df['start_char'] + df.answer.apply(lambda x: len(x['text'][0]))
-	df['final_answer'] = [A[B:C] for A, B, C in zip(df.context, df['start_char'], df['end_char'])]
-
-	question = df.loc[id_example, 'question']
-	answer = df.loc[id_example, 'answer']
-	start_char = df.loc[id_example, 'start_char']
-	end_char = df.loc[id_example, 'end_char']
-
-	#answer_word = answer["text"][0]
-	#start_char = answer["text"][0]
-	context = df.loc[id_example, 'context']
-
-	context_before = context[:start_char]
-	the_answer = context[start_char:end_char]
-	context_after = context[end_char:]
-	context_before_augment = transform_context(context_before)
-	print(context_before[:250])
-	print(context_before_augment[:250])
-	#print(question)
-	#print(the_answer)
+	augment_dataset_dict(dataset_dict)
