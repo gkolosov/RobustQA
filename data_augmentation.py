@@ -1,7 +1,13 @@
 import pandas as pd
 import numpy as np
-
+from nltk.corpus import wordnet
+from nltk.tokenize import word_tokenize
+from random import randint
+import nltk.data
+import string
+import random
 CHANGES = dict(zip([" game ", " was "], [" lame ", " sos "]))
+
 
 def augment_dataset_dict(dataset_dict, changes = None):
 	changes=CHANGES
@@ -32,7 +38,7 @@ from random import shuffle
 random.seed(1)
 
 #stop words list
-stop_words = ['i', 'me', 'my', 'myself', 'we', 'our',
+stop_words = ['i','I', 'me', 'my', 'myself', 'we', 'our',
 			'ours', 'ourselves', 'you', 'your', 'yours',
 			'yourself', 'yourselves', 'he', 'him', 'his',
 			'himself', 'she', 'her', 'hers', 'herself',
@@ -52,31 +58,31 @@ stop_words = ['i', 'me', 'my', 'myself', 'we', 'our',
 			'few', 'more', 'most', 'other', 'some', 'such', 'no',
 			'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too',
 			'very', 's', 't', 'can', 'will', 'just', 'don',
-			'should', 'now', '']
+			'should', 'now','may','us', '']
 
 #cleaning up text
 import re
 def get_only_chars(line):
 
-    clean_line = ""
+	clean_line = ""
 
-    line = line.replace("’", "")
-    line = line.replace("'", "")
-    line = line.replace("-", " ") #replace hyphens with spaces
-    line = line.replace("\t", " ")
-    line = line.replace("\n", " ")
-    line = line.lower()
+	line = line.replace("’", "")
+	line = line.replace("'", "")
+	line = line.replace("-", " ") #replace hyphens with spaces
+	line = line.replace("\t", " ")
+	line = line.replace("\n", " ")
+	line = line.lower()
 
-    for char in line:
-        if char in 'qwertyuiopasdfghjklzxcvbnm ':
-            clean_line += char
-        else:
-            clean_line += ' '
+	for char in line:
+		if char in 'qwertyuiopasdfghjklzxcvbnm ':
+			clean_line += char
+		else:
+			clean_line += ' '
 
-    clean_line = re.sub(' +',' ',clean_line) #delete extra spaces
-    if clean_line[0] == ' ':
-        clean_line = clean_line[1:]
-    return clean_line
+	clean_line = re.sub(' +',' ',clean_line) #delete extra spaces
+	if clean_line[0] == ' ':
+		clean_line = clean_line[1:]
+	return clean_line
 
 ########################################################################
 # Synonym replacement
@@ -123,9 +129,97 @@ def get_synonyms(word):
 		synonyms.remove(word)
 	return list(synonyms)
 
+def transform_context(text, p=0.5):
 
+	# Load a text file if required
+	output = ""
+	counter = 0
+
+	# Load the pretrained neural net
+	tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
+
+	# Tokenize the text
+	tokenized = tokenizer.tokenize(text)
+
+	# Get the list of words from the entire text
+	words = word_tokenize(text)
+
+	# Identify the parts of speech
+	tagged = nltk.pos_tag(words)
+
+	for i in range(0, len(words)):
+		#if words[i]  in stop_words:
+		#	output = output + " " + words[i]
+			#continue
+		replacements = []
+
+		# Only replace nouns with nouns, vowels with vowels etc.
+		for syn in wordnet.synsets(words[i]):
+
+			# Do not attempt to replace proper nouns or determiners
+			if tagged[i][1] == 'NNP' or tagged[i][1] == 'DT':
+				break
+
+			# The tokenizer returns strings like NNP, VBP etc
+			# but the wordnet synonyms has tags like .n.
+			# So we extract the first character from NNP ie n
+			# then we check if the dictionary word has a .n. or not
+			word_type = tagged[i][1][0].lower()
+			if syn.name().find("." + word_type + "."):
+				# extract the word only
+
+				r = syn.name()[0:syn.name().find(".")]
+				if r != words[i]:
+					replacements.append(r)
+
+		if (len(replacements) > 0) and (random.random()>p) and (words[i] not in stop_words):
+			# Choose a random replacement
+			replacement = replacements[randint(0, len(replacements) - 1)]
+			#print(words[i] + " replaced by " + replacement)
+			#counter += len(replacement) - len(words[i])
+			output = output + " " + replacement
+
+		else:
+			# If no replacement could be found, then just use the
+			# original word
+			if (words[i] in string.punctuation) or (len(output)==0):
+				output = output + words[i]
+			else:
+				output = output + " " + words[i]
+	return	output
+
+
+## TODO  Separer context avant et apres rep
 
 if __name__ == '__main__':
-    word = ['interesting', 'boring']
-    print(synonym_replacement(word, 10))
+	#word = ['interesting', 'boring']
+	#print(synonym_replacement(word, 10))
+	from debug_german import get_dataset2
 
+	id_example=249
+	dataset_dict = get_dataset2(datasets='duorc,race', data_dir='datasets/oodomain_train', split_name="train", debug=-1)
+	original_df = pd.DataFrame({x: dataset_dict[x] for x in dataset_dict})
+	df = original_df.copy()
+	# df['context'] = df.context.str.strip().replace(changes, regex=True)
+
+	df['start_char'] = df.answer.apply(lambda x: x['answer_start'][0])
+	df['end_char'] = df['start_char'] + df.answer.apply(lambda x: len(x['text'][0]))
+	df['final_answer'] = [A[B:C] for A, B, C in zip(df.context, df['start_char'], df['end_char'])]
+
+	question = df.loc[id_example, 'question']
+	answer = df.loc[id_example, 'answer']
+	start_char = df.loc[id_example, 'start_char']
+	end_char = df.loc[id_example, 'end_char']
+
+	#answer_word = answer["text"][0]
+	#start_char = answer["text"][0]
+	context = df.loc[id_example, 'context']
+
+	context_before = context[:start_char]
+	the_answer = context[start_char:end_char]
+	context_after = context[end_char:]
+	context_before_augment = transform_context(context_before)
+	print(context_before[:250])
+	print(context_before_augment[:250])
+	#print(question)
+	#print(the_answer)

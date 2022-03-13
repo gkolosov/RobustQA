@@ -16,8 +16,10 @@ from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from args import get_train_test_args
 
-from abstract_trainer import get_dataset
+#from abstract_trainer import get_dataset
 from data_augmentation import augment_dataset_dict
+
+CHANGES = dict(zip([" game ", " was "], [" lame ", " sos "]))
 
 def main():
     args = get_train_test_args()
@@ -36,7 +38,7 @@ def main():
     #train_dataset, _, _ = get_dataset(args, args.train_datasets, args.train_dir, tokenizer, 'train', debug=args.debug)
     #model = trainer.setup_model(args, do_train=True)
     log.info("Preparing Validation Data...")
-    val_dataset, val_dict, _ = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
+    #val_dataset, val_dict, _ = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
 
 
 def get_dataset2(datasets, data_dir, split_name, debug=-1):
@@ -57,17 +59,40 @@ def get_dataset2(datasets, data_dir, split_name, debug=-1):
         label += 1
     num_classes = label
     #Data Augmentation
-    dataset_dict_test = augment_dataset_dict(dataset_dict)
+    #dataset_dict_test = augment_dataset_dict(dataset_dict)
 
     #print(dataset_dict['question'][-1])
     #print(dataset_dict_test['question'][-1])
 
-    print(len(dataset_dict['label']))
-    print(len(dataset_dict_test['label']))
-    print(len(dataset_dict['question']))
-    print(len(dataset_dict_test['question']))
+    #print(len(dataset_dict['label']))
+    #print(len(dataset_dict_test['label']))
+    #print(len(dataset_dict['question']))
+    #print(len(dataset_dict_test['question']))
     #data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
     #return util.QADataset(data_encodings, train=(split_name == 'train')), dataset_dict, num_classes
+
+    return dataset_dict
+def augment(datasets, data_dir, split_name, debug=-1):
+    datasets = datasets.split(',')
+    dataset_dict = None
+    dataset_name = ''
+    label = 0
+    for dataset in datasets:
+        dataset_name += f'_{dataset}'
+        dataset_dict_curr = util.read_squad(f'{data_dir}/{dataset}')
+        key = next(iter(dataset_dict_curr.keys()))
+        dataset_dict_curr['label'] = [label] * len(dataset_dict_curr[key])
+        dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
+        label += 1
+    num_classes = label
+
+    changes = CHANGES
+    original_df = pd.DataFrame({x: dataset_dict[x] for x in dataset_dict})
+    df = original_df.copy()
+    df['context'] = df.context.str.strip().replace(changes, regex=True)
+    new_dataset_dict = pd.concat([original_df, df[[i for i in dataset_dict.keys()]]]).to_dict(orient='list')
+    print()
+
 
 
 def sr():
@@ -101,4 +126,5 @@ def sr():
 
 if __name__ == '__main__':
 
-    get_dataset2(datasets = 'duorc,race', data_dir ='datasets/oodomain_train' , split_name="train", debug=-1)
+    #get_dataset2(datasets = 'duorc,race', data_dir ='datasets/oodomain_train' , split_name="train", debug=-1)
+    augment(datasets = 'duorc,race', data_dir ='datasets/oodomain_train' , split_name="train", debug=-1)
