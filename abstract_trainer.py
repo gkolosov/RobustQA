@@ -15,7 +15,7 @@ from transformers import DistilBertTokenizerFast
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import RandomSampler, SequentialSampler
 from args import get_train_test_args
-
+from data_augmentation import augment_dataset_dict
 
 def prepare_eval_data(dataset_dict, tokenizer):
     tokenized_examples = tokenizer(dataset_dict['question'],
@@ -274,6 +274,8 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=-1):
         dataset_dict = util.merge(dataset_dict, dataset_dict_curr)
         label += 1
     num_classes = label
+    if args.augment and split_name=='train':
+        data_encodings= augment_dataset_dict(dataset_dict)
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
     return util.QADataset(data_encodings, train=(split_name == 'train')), dataset_dict, num_classes
 

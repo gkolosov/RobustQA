@@ -28,5 +28,6 @@ def get_train_test_args():
     parser.add_argument('--freeze-dis', action='store_true')
     parser.add_argument('--debug', type=int, default=-1)
     parser.add_argument('--dis-lambda', type=float, default=1e-2)
+    parser.add_argument('--augment', action='store_true')
     args = parser.parse_args()
     return args
