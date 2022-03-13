@@ -11,3 +11,4 @@ elif [ "$1" = "debug" ]; then
 else
 	echo "Invalid Option Selected"
 fi
+

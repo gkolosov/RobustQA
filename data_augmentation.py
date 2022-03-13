@@ -62,8 +62,8 @@ def augment_dataset_dict(dataset_dict, p = 0.2):
 	#print(tst)
 	df=df[['new_context', 'question', 'new_answer', 'label', 'id']].rename(columns={'new_context':'context','new_answer':'answer'})
 
-	print(original_df.context[29][:200])
-	print(df.context[29][:200])
+	#print(original_df.context[29][:200])
+	#print(df.context[29][:200])
 
 	new_dataset_dict = pd.concat([original_df, df[[i for i in dataset_dict.keys()]]])
 
