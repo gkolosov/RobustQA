@@ -39,6 +39,8 @@ def main():
     val_dataset, val_dict, _ = get_dataset(args, args.train_datasets, args.val_dir, tokenizer, 'val', debug=args.debug)
 
 
+
+
 def sr():
     tokenizer = DistilBertTokenizerFast.from_pretrained('distilbert-base-uncased')
     datasets = 'duorc,race'
