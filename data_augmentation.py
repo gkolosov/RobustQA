@@ -30,7 +30,7 @@ def augment_dataset_dict_depr(dataset_dict, changes = None):
 
 
 
-def augment_dataset_dict(dataset_dict, p_sr=0.5, p_rd=0, N=1):
+def augment_dataset_dict(dataset_dict, p_sr=0.5, p_rd=0.2, N=5):
 	res=[]
 
 	original_df = pd.DataFrame({x: dataset_dict[x] for x in dataset_dict})
