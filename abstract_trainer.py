@@ -276,7 +276,7 @@ def get_dataset(args, datasets, data_dir, tokenizer, split_name, debug=-1):
     num_classes = label
     if args.augment and split_name=='train':
         print("Preparing augmented  Data...")
-        dataset_dict= augment_dataset_dict(dataset_dict)
+        dataset_dict= augment_dataset_dict(dataset_dict, p_sr=args.p_sr, p_rd=args.p_rd, N=args.N)
     data_encodings = read_and_process(args, tokenizer, dataset_dict, data_dir, dataset_name, split_name)
     return util.QADataset(data_encodings, train=(split_name == 'train')), dataset_dict, num_classes
 
