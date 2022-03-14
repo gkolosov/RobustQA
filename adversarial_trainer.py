@@ -12,6 +12,7 @@ class AdversarialTrainer(AbstractTrainer):
         super(AdversarialTrainer, self).__init__(args, log)
         self.freeze_bert = False
         self.freeze_dis = False
+        self.freeze_qa = False
 
     def setup_model(self, args, do_train=False, do_eval=False, num_classes=3):
         model = DomainQA(num_classes=num_classes, hidden_size=768,
@@ -36,6 +37,11 @@ class AdversarialTrainer(AbstractTrainer):
         if args.freeze_dis:
             self.freeze_dis = True
             for param in model.discriminator.parameters():
+                param.requires_grad = False
+
+        if args.freeze_qa:
+            self.freeze_qa = True
+            for param in model.qa_outputs.parameters():
                 param.requires_grad = False
 
         device = self.device
@@ -66,15 +72,18 @@ class AdversarialTrainer(AbstractTrainer):
         token_type_ids = batch['sequence_ids'].to(device)
         labels = batch['labels'].to(device)
 
-        optim['qa'].zero_grad()
-        qa_loss = model(input_ids=input_ids, attention_mask=attention_mask,
-                        start_positions=start_positions,
-                        end_positions=end_positions, dtype='qa', labels=labels)
+        if self.freeze_qa:
+            qa_loss = torch.tensor(0)
+        else:
+            optim['qa'].zero_grad()
+            qa_loss = model(input_ids=input_ids, attention_mask=attention_mask,
+                            start_positions=start_positions,
+                            end_positions=end_positions, dtype='qa', labels=labels)
 
-        qa_loss.backward()
-        optim['qa'].step()
+            qa_loss.backward()
+            optim['qa'].step()
         
-        if self.freeze_dis:
+        if not self.freeze_dis:
             return input_ids, qa_loss
             
         optim['dis'].zero_grad()
