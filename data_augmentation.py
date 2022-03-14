@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import copy
 from nltk.corpus import wordnet
 from nltk.tokenize import word_tokenize
 from random import randint
@@ -12,7 +13,7 @@ CHANGES = dict(zip([" game ", " was "], [" lame ", " sos "]))
 def augment_dataset_dict_depr(dataset_dict, changes = None):
 	changes=CHANGES
 	original_df = pd.DataFrame({x: dataset_dict[x] for x in dataset_dict})
-	df= original_df.copy()
+	df= copy.deepcopy(original_df)
 	df['context'] = df.context.str.strip().replace(changes, regex=True)
 	new_dataset_dict = pd.concat([original_df, df[[i for i in dataset_dict.keys()]]]).to_dict(orient='list')
 	#TODO : Correct for start end shifts, do not modify answers
@@ -30,9 +31,12 @@ def augment_dataset_dict_depr(dataset_dict, changes = None):
 
 
 def augment_dataset_dict(dataset_dict, p = 0.2):
+	dataset_dict_copy=copy.deepcopy(dataset_dict)
+
 	original_df = pd.DataFrame({x: dataset_dict[x] for x in dataset_dict})
-	df = original_df.copy()
-	d=dataset_dict.copy()
+	df = pd.DataFrame({x: dataset_dict_copy[x] for x in dataset_dict_copy})
+
+	#d=dataset_dict.copy()
 	# df['context'] = df.context.str.strip().replace(changes, regex=True)
 
 	df['start_char'] = df.answer.apply(lambda x: x['answer_start'][0])
@@ -46,29 +50,25 @@ def augment_dataset_dict(dataset_dict, p = 0.2):
 	df['context_before'] = df['context_before'].apply(lambda t: transform_context(t, p=p))
 	df['context_after'] = df['context_after'].apply(lambda t: transform_context(t, p=p))
 
-	df['new_context'] = df['context_before'] + df['context_answer'] + df['context_after']
+	df['new_context'] = df['context_before'] + df['context_answer'] + " " +df['context_after']
 	df['new_start_char'] = df['context_before'].str.len()
 
-	#df['new_end_char'] = df['new_start_char'] + df.answer.apply(lambda x: len(x['text'][0]))
-	#df['final_answer'] = [A[B:C] for A, B, C in zip(df.new_context, df['new_start_char'], df['new_end_char'])]
-	for i, l in enumerate(d['answer']):
-		l['answer_start'][0] = df['new_start_char'].iloc[i]
-	df['new_answer'] = d['answer']
+	a = df.answer.apply(pd.Series)
+	a['n'] = df['new_start_char']
+	a['answer_start'] = [replace(A, B) for A, B in zip(a.answer_start, a.n)]
+	new_answer = a[['answer_start', 'text']].to_dict('records')
+	df['new_answer']=new_answer
 
-	#df['start_char__'] = df.new_answer.apply(lambda x: x['answer_start'][0])
-	#df['end_char__'] = df['start_char__'] + df.new_answer.apply(lambda x: len(x['text'][0]))
-	#df['final_answer__'] = [A[B:C] for A, B, C in zip(df.new_context, df['start_char__'], df['end_char__'])]
-	#tst= df[['final_answer__',  'final_answer0']]
-	#print(tst)
 	df=df[['new_context', 'question', 'new_answer', 'label', 'id']].rename(columns={'new_context':'context','new_answer':'answer'})
-
-	#print(original_df.context[29][:200])
-	#print(df.context[29][:200])
-
+	#print(original_df.context[32][original_df.answer[32]['answer_start'][0]:])
+	#print(df.context[32][df.answer[32]['answer_start'][0]:])
 	new_dataset_dict = pd.concat([original_df, df[[i for i in dataset_dict.keys()]]])
-
 	return new_dataset_dict.to_dict(orient='list')
 
+
+def replace(l, el):
+    l[0]=el
+    return l
 # Easy data augmentation techniques for text classification
 # Jason Wei and Kai Zou
 
