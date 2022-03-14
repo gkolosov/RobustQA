@@ -30,39 +30,49 @@ def augment_dataset_dict_depr(dataset_dict, changes = None):
 
 
 
-def augment_dataset_dict(dataset_dict, p = 0.2):
-	dataset_dict_copy=copy.deepcopy(dataset_dict)
+def augment_dataset_dict(dataset_dict, p_sr=0.5, p_rd=0, N=1):
+	res=[]
 
 	original_df = pd.DataFrame({x: dataset_dict[x] for x in dataset_dict})
-	df = pd.DataFrame({x: dataset_dict_copy[x] for x in dataset_dict_copy})
+	res.append(original_df)
+	#print(original_df.context[42][:100])
+	for _ in range(N):
+		dataset_dict_copy = copy.deepcopy(dataset_dict)
+		df = pd.DataFrame({x: dataset_dict_copy[x] for x in dataset_dict_copy})
+		#d=dataset_dict.copy()
+		# df['context'] = df.context.str.strip().replace(changes, regex=True)
+		df['start_char'] = df.answer.apply(lambda x: x['answer_start'][0])
+		df['end_char'] = df['start_char'] + df.answer.apply(lambda x: len(x['text'][0]))
+		#df['final_answer0'] = [A[B:C] for A, B, C in zip(df.context, df['start_char'], df['end_char'])]
 
-	#d=dataset_dict.copy()
-	# df['context'] = df.context.str.strip().replace(changes, regex=True)
+		df['context_before'] = [A[:C] for A, C in zip(df.context, df['start_char'])]
+		df['context_after'] = [A[C:] for A, C in zip(df.context, df['end_char'])]
+		df['context_answer'] = [A[B:C] for A, B, C in zip(df.context, df['start_char'], df['end_char'])]
 
-	df['start_char'] = df.answer.apply(lambda x: x['answer_start'][0])
-	df['end_char'] = df['start_char'] + df.answer.apply(lambda x: len(x['text'][0]))
-	#df['final_answer0'] = [A[B:C] for A, B, C in zip(df.context, df['start_char'], df['end_char'])]
+		df['context_before'] = df['context_before'].apply(lambda t: transform_context(t, p_sr=p_sr, p_rd=p_rd))
+		df['context_after'] = df['context_after'].apply(lambda t: transform_context(t, p_sr=p_sr, p_rd=p_rd))
 
-	df['context_before'] = [A[:C] for A, C in zip(df.context, df['start_char'])]
-	df['context_after'] = [A[C:] for A, C in zip(df.context, df['end_char'])]
-	df['context_answer'] = [A[B:C] for A, B, C in zip(df.context, df['start_char'], df['end_char'])]
+		df['new_context'] = df['context_before'] + df['context_answer'] + " " +df['context_after']
+		df['new_start_char'] = df['context_before'].str.len()
 
-	df['context_before'] = df['context_before'].apply(lambda t: transform_context(t, p=p))
-	df['context_after'] = df['context_after'].apply(lambda t: transform_context(t, p=p))
+		a = df.answer.apply(pd.Series)
+		a['n'] = df['new_start_char']
+		a['answer_start'] = [replace(A, B) for A, B in zip(a.answer_start, a.n)]
+		new_answer = a[['answer_start', 'text']].to_dict('records')
+		df['new_answer']=new_answer
 
-	df['new_context'] = df['context_before'] + df['context_answer'] + " " +df['context_after']
-	df['new_start_char'] = df['context_before'].str.len()
-
-	a = df.answer.apply(pd.Series)
-	a['n'] = df['new_start_char']
-	a['answer_start'] = [replace(A, B) for A, B in zip(a.answer_start, a.n)]
-	new_answer = a[['answer_start', 'text']].to_dict('records')
-	df['new_answer']=new_answer
-
-	df=df[['new_context', 'question', 'new_answer', 'label', 'id']].rename(columns={'new_context':'context','new_answer':'answer'})
+		df=df[['new_context', 'question', 'new_answer', 'label', 'id']].rename(columns={'new_context':'context','new_answer':'answer'})
+		res.append(df[[i for i in dataset_dict.keys()]])
+		#print(df.context[42][:100])
 	#print(original_df.context[32][original_df.answer[32]['answer_start'][0]:])
 	#print(df.context[32][df.answer[32]['answer_start'][0]:])
-	new_dataset_dict = pd.concat([original_df, df[[i for i in dataset_dict.keys()]]])
+
+	#print(original_df.context[42][:100])
+	#print(df.context[42][:100])
+
+	new_dataset_dict = pd.concat(res)
+
+	assert(len(original_df)*(N+1)==len(new_dataset_dict))
 	return new_dataset_dict.to_dict(orient='list')
 
 
@@ -74,7 +84,7 @@ def replace(l, el):
 
 import random
 from random import shuffle
-random.seed(1)
+#random.seed(1)
 
 PONCT='!"#$%&\')*+,-./:;<=>?@[\\]^_`{|}~'
 #stop words list
@@ -169,20 +179,20 @@ def get_synonyms(word):
 		synonyms.remove(word)
 	return list(synonyms)
 
-def augment_context(context,start_char, len_answer,  p=0.5):
+def augment_context(context,start_char, len_answer,  p=0.5, p_del=0, N=1):
 	end_char = start_char+ len_answer
 	context_before = context[:start_char]
 	the_answer = context[start_char:end_char]
 	context_after = context[end_char:]
-	context_before_augment = transform_context(context_before,p=p)
-	context_after_augment = transform_context(context_after, p=p)
+	context_before_augment = transform_context(context_before,p=p, p_del=p_del)
+	context_after_augment = transform_context(context_after, p=p, p_del=p_del)
 
 	new_start_char = len(context_before_augment)
 	new_context = context_before_augment+the_answer+context_after_augment
 	return new_context, new_start_char
 
 
-def transform_context(text, p=0.5):
+def transform_context(text, p_sr=0.5,p_rd=0.2):
 
 	# Load a text file if required
 	output = ""
@@ -199,6 +209,9 @@ def transform_context(text, p=0.5):
 	tagged = nltk.pos_tag(words)
 
 	for i in range(0, len(words)):
+		if random.random() < p_rd:
+			continue
+
 		#if words[i]  in stop_words:
 		#	output = output + " " + words[i]
 			#continue
@@ -219,10 +232,10 @@ def transform_context(text, p=0.5):
 				# extract the word only
 
 				r = syn.name()[0:syn.name().find(".")]
-				if r != words[i]:
+				if (r != words[i]) & ("_" not in r):
 					replacements.append(r)
 
-		if (len(replacements) > 0) and (random.random()>p) and (words[i] not in stop_words):
+		if (len(replacements) > 0) and (random.random()<p_sr) and (words[i] not in stop_words):
 			# Choose a random replacement
 			replacement = replacements[randint(0, len(replacements) - 1)]
 			#print(words[i] + " replaced by " + replacement)
@@ -246,6 +259,6 @@ if __name__ == '__main__':
 	#print(synonym_replacement(word, 10))
 	from debug_german import get_dataset2
 
-	id_example=200
+	#print(transform_context("back turn return home fast lazy", p=0.5, p_del=0.1))
 	dataset_dict = get_dataset2(datasets='duorc,race', data_dir='datasets/oodomain_train', split_name="train", debug=-1)
-	augment_dataset_dict(dataset_dict)
+	augment_dataset_dict(dataset_dict, p_sr=0.5, p_rd=0, N=2)
