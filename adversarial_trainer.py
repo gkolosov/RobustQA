@@ -83,7 +83,7 @@ class AdversarialTrainer(AbstractTrainer):
             qa_loss.backward()
             optim['qa'].step()
         
-        if not self.freeze_dis:
+        if self.freeze_dis:
             return input_ids, qa_loss
             
         optim['dis'].zero_grad()
