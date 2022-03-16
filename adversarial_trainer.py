@@ -1,10 +1,9 @@
 import os
 import torch
 from transformers import AdamW
-
 from model_advers import DomainQA
-
 from abstract_trainer import AbstractTrainer, main
+## ADAPTED FROM THE AUTHORS : https://github.com/seanie12/mrqa
 
 
 class AdversarialTrainer(AbstractTrainer):
